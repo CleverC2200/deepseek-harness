@@ -295,7 +295,9 @@ function sourceMapSnapshot(clientPath: string): WebPluginRecord['sourceMap'] {
 /** Count generated lines while assembling indexed-map section offsets. */
 function newlineCount(value: string): number {
   let count = 0
-  for (const char of value) if (char === '\n') count += 1
+  for (let offset = value.indexOf('\n'); offset !== -1; offset = value.indexOf('\n', offset + 1)) {
+    count += 1
+  }
   return count
 }
 
