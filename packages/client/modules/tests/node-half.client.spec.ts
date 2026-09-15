@@ -684,6 +684,33 @@ describe('client bundle activation', () => {
     expect(map.sections[0]?.map).not.toHaveProperty('sourceRoot')
   })
 
+  it.each([
+    { name: 'empty source', source: '', secondLine: 2 },
+    { name: 'Unicode without a trailing newline', source: '/* 中文😀 */', secondLine: 2 },
+    { name: 'CRLF and blank lines', source: '/* 中文😀 */\r\n\n/* end */', secondLine: 4 },
+    { name: 'non-LF separators', source: '/* a\rb\u2028c\u2029d */', secondLine: 2 },
+    { name: 'long minified Unicode source', source: `/* ${'中文😀'.repeat(16384)} */\n`, secondLine: 2 },
+  ])('preserves combo map offsets for $name', async ({ source, secondLine }) => {
+    const firstPath = writePackage('@fixture/lines-first')
+    const secondPath = writePackage('@fixture/lines-second')
+    mkdirSync(dirname(firstPath), { recursive: true })
+    mkdirSync(dirname(secondPath), { recursive: true })
+    writeFileSync(firstPath, source)
+    writeFileSync(secondPath, 'module.exports = {}\n')
+    const { service, route } = constructWithRoute(['@fixture/lines-first', '@fixture/lines-second'])
+    const url = service.graph().batches[0]!.url
+    const script = (await routeRequest(route, url)).body.toString('utf8')
+    const normalized = source.endsWith('\n') ? source : `${source}\n`
+    expect(script.startsWith(`${normalized};\nmodule.exports = {}\n;\n`)).toBe(true)
+    const payload = JSON.parse((await routeRequest(route, mapUrl(url))).body.toString('utf8')) as {
+      sections: { offset: { line: number; column: number } }[]
+    }
+    expect(payload.sections.map(section => section.offset)).toEqual([
+      { line: 0, column: 0 },
+      { line: secondLine, column: 0 },
+    ])
+  })
+
   it('maps a non-zero second batch section through a standard source-map consumer', async () => {
     const firstName = '@fixture/offset-first'
     const secondName = '@fixture/offset-second'

@@ -67,7 +67,7 @@ application combo 脚本在启动时仅注册一次插件 factory；模块主体
 
 Node 半侧逐包增量扫描——没有全量重扫路径。每次发出 `internal/plugin` 事件时，系统都会把该 fiber 的 entry 名标脏；微任务 flush 会把每个脏名与当前 loader 条目对账，激活 pass 会初始化同一个脏集合并同步 flush，因此首次扫描与稳态共用同一实现。包元数据按 Loader specifier 与所属 tree base URL 缓存至重启，解析出的 manifest（元数据清单）包名作为浏览器模块身份。若不同的 active Loader source 解析到同一包名，组合会失败；移除冲突来源后，剩余来源无需重启 fiber 即可接替。bundle 内容变更只能通过 `rebuilt()`（HMR 钩子）进入图。
 
-Node 半侧会在发布前快照每个客户端 bundle 及其现有 source map。它把资源分组到 `/plugins/??...&rev=...` combo URL：modules row 使用一个 bootstrap combo，其余 row 使用一个或多个 application combo；每个阶段都会在 URL 超过 3 KiB 之前分区。每个 combo map 都是 Indexed Source Map v3，并在可用时使用作者提供的 section，否则为已打包 bundle 生成 identity section。初始逐插件 revision 使用进程 nonce，所以启动时不哈希每个插件；HMR 只哈希被报告为已变化的产物。已公告响应不可变；未知组合或 revision 返回 404。
+Node 半侧会在发布前快照每个客户端 bundle 及其现有 source map。它把资源分组到 `/plugins/??...&rev=...` combo URL：modules row 使用一个 bootstrap combo，其余 row 使用一个或多个 application combo；每个阶段都会在 URL 超过 3 KiB 之前分区。每个 combo map 都是 Indexed Source Map v3，并在可用时使用作者提供的 section，否则为已打包 bundle 生成 identity section。生成行偏移按 LF 分隔符统计；CRLF、Unicode 内容及末尾换行归一化保持相同的 section 位置。初始逐插件 revision 使用进程 nonce，所以启动时不哈希每个插件；HMR 只哈希被报告为已变化的产物。已公告响应不可变；未知组合或 revision 返回 404。
 
 ### 启动 manifest 注入
 
