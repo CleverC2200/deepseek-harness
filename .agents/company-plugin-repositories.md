@@ -7,13 +7,15 @@
 | 项目 / 仓库 | 负责的改动 |
 | --- | --- |
 | `dpherness` / `deepseek-harness` | 官方 DSH 基础能力与上游同步；`origin` 是个人 fork，`upstream` 是 deepseek-ai 官方仓库。 |
-| `dsh-gea-plugin` | GEA 登录、组织身份、业务导航、需求预测与销售计划审批页面、业务接口和模型上下文；`desktop/` 负责 GEA Electron 壳、图标、启动、公司默认配置和安装包。 |
+| `dsh-gea-plugin` | GEA 登录、组织身份、业务导航、需求预测与销售计划审批页面、业务接口和模型上下文；`desktop/` 是公司客户端源码、构建和安装包的唯一入口，负责 GEA Electron 壳、图标、启动和公司默认配置。 |
 | `dsh-agent-workbench` | 多 Agent 共用布局、业务页面与原生对话并排显示、页面与业务实例的 Session 关联；复用 DSH 原生会话与输入框，不放 GEA 业务规则。 |
 | `dsh-plugin-hub` | 公司 DSH 插件目录、插件安装更新界面与执行接入；派生自第三方 dshplugin/dsh-plugin-hub，不是官方插件。 |
 | `dsh-agent-manage` | Agent 资源套件的来源、安装、启用，技能、命令、角色、MCP/LSP 管理与 GEA 登录后的 MCP 接入。 |
 | `company-agent-suites` | 公司角色、技能、提示词和命令内容，由 Agent Manage 消费；这是资源套件仓库，不是 DSH 运行时插件。 |
 
 GEA 单向依赖独立工作台，工作台不依赖 GEA；修改公共布局进入工作台，修改具体业务页面进入业务插件。不要在 GEA 中恢复 `packages/agent-workbench` 源码副本。新增带交互页面的 Agent 使用公共工作台接口并拥有自己的业务插件；纯技能、角色或命令内容进入套件仓库。
+
+各插件仓库默认只构建和发布自己的插件包，`company-agent-suites` 只发布资源套件。普通页面、文案、样式和插件业务逻辑改动不触发客户端安装包；在桌面中验证插件也不等于重打客户端。只有 Electron 壳、启动器、内置运行时、安装或桌面更新协议需要改变，或者用户明确要求发布客户端时，才在 `dsh-gea-plugin/desktop/` 构建客户端。其他仓库发现客户端兼容需求时记录依赖并交给该目录处理，不自行维护桌面打包入口。
 
 区分第三方 `dsh-plugin` 插件与官方 `dsh plugin` 命令：后者调用 pnpm 管理 profile 插件。不要把资源套件刷新当作运行时插件升级，也不要把独立仓库等同于已实现桌面外置更新；检查桌面加载目录、版本依赖和重启机制后再承诺更新能力。GitHub 上游同步仅更新 DSH 仓库，不能顺带更改插件依赖锁、桌面运行版本或重打安装包。
 
