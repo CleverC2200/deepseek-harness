@@ -15,6 +15,8 @@ export interface OpenInAppActionInjected {
   launch: (appId: string, path: string) => Promise<void>
   choose: (appId: string) => void
   iconUrl: (appId: string) => string
+  /** Whether the remembered-app quick-launch button is available in this profile. */
+  showPrimaryAction: boolean
 }
 
 /** Full props for the Session-header open-in-app split button. */
@@ -197,19 +199,21 @@ export function OpenInAppAction(props: OpenInAppActionProps): React.JSX.Element 
         launch(id)
       }}
       anchor={(
-        <div className={css.split}>
-          <Tooltip label={phase === 'error' ? t('open.error') : t('open.tooltip')} side="bottom">
-            <button
-              type="button"
-              className={css.main}
-              data-state={phase}
-              disabled={phase === 'busy'}
-              aria-label={title}
-              onClick={() => { launch(current) }}
-            >
-              <AppIcon id={current} url={props.iconUrl(current)} size={15} />
-            </button>
-          </Tooltip>
+        <div className={css.split} data-has-primary-action={props.showPrimaryAction}>
+          {props.showPrimaryAction && (
+            <Tooltip label={phase === 'error' ? t('open.error') : t('open.tooltip')} side="bottom">
+              <button
+                type="button"
+                className={css.main}
+                data-state={phase}
+                disabled={phase === 'busy'}
+                aria-label={title}
+                onClick={() => { launch(current) }}
+              >
+                <AppIcon id={current} url={props.iconUrl(current)} size={15} />
+              </button>
+            </Tooltip>
+          )}
           <button
             type="button"
             className={css.chevron}

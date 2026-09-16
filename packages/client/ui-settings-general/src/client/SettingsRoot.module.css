@@ -2,9 +2,9 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: calc(100% + 4px);
-  margin: 4px -2px;
+  gap: 4px;
+  width: auto;
+  margin: 4px 0;
 }
 
 .triggerRow.railRow {
@@ -13,18 +13,19 @@
 }
 
 .trigger {
-  flex: 1;
+  flex: none;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: auto;
-  height: 42px;
+  justify-content: center;
+  gap: 0;
+  width: 36px;
+  height: 36px;
   margin: 0;
-  padding: 0 10px 0 8px;
+  padding: 0;
   box-sizing: border-box;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
   overflow: hidden;
@@ -47,13 +48,7 @@
   justify-content: center;
   gap: 0;
   padding: 0;
-  border-radius: 50%;
-  corner-shape: round;
-}
-
-.triggerLabel {
-  overflow: hidden;
-  white-space: nowrap;
+  border-radius: 8px;
 }
 
 /* Full-viewport layer (figma Mask 501:29946 #000@24%): mask tokens match the

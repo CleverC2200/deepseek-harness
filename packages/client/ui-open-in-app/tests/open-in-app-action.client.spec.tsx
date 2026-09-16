@@ -27,6 +27,7 @@ function bench(over: {
   apps?: readonly string[] | null
   choice?: string
   cwd?: string
+  showPrimaryAction?: boolean
   launch?: (appId: string, path: string) => Promise<void>
 } = {}): Bench {
   const state = {
@@ -56,6 +57,7 @@ function bench(over: {
     launch,
     choose,
     iconUrl: (appId: string) => `/open-in-app/icon/${appId}`,
+    showPrimaryAction: over.showPrimaryAction ?? true,
     t,
   } as unknown as OpenInAppActionProps
   return { props, launch, choose }
@@ -84,6 +86,12 @@ describe('OpenInAppAction visibility', () => {
 
     render(<OpenInAppAction {...bench({ apps: ['finder', 'cursor'], choice: 'vscode', cwd: '/w' }).props} />)
     expect(screen.getByRole('button', { name: zh['open.title'].replace('{app}', zh['app.finder']) })).toBeDefined()
+  })
+
+  it('keeps the application menu while a profile hides the quick-launch button', () => {
+    render(<OpenInAppAction {...bench({ apps: ['finder', 'cursor'], cwd: '/w', showPrimaryAction: false }).props} />)
+    expect(screen.queryByRole('button', { name: zh['open.title'].replace('{app}', zh['app.finder']) })).toBeNull()
+    expect(screen.getByRole('button', { name: zh['menu.toggle'] })).toBeDefined()
   })
 })
 

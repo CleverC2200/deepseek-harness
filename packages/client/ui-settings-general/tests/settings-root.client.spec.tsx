@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+import { TriggerContent, type TriggerContentProps } from '../src/client/chrome.tsx'
 import { en, zh } from '../src/client/locales.ts'
 
 // Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
@@ -129,6 +130,17 @@ function openPanel() {
 }
 
 describe('SettingsRoot trigger', () => {
+  it('keeps the settings trigger icon-only at both sidebar widths', () => {
+    const { container, rerender } = render(
+      <TriggerContent {...({ wide: true, t: makeTranslate(en) } as TriggerContentProps)} />,
+    )
+    expect(screen.queryByText('Settings')).toBeNull()
+    expect(container.querySelector('svg')).not.toBeNull()
+
+    rerender(<TriggerContent {...({ wide: false, t: makeTranslate(en) } as TriggerContentProps)} />)
+    expect(container.querySelector('svg')).not.toBeNull()
+  })
+
   it.each([
     { column: 'expanded English', wide: true, dictionary: en, name: 'Settings' },
     { column: 'collapsed English', wide: false, dictionary: en, name: 'Settings' },

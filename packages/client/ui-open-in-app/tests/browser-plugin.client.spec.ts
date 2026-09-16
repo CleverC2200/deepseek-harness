@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { apply, inject, type OpenInAppActionInjected } from '../src/client/index.ts'
+import { apply, inject, type Config, type OpenInAppActionInjected } from '../src/client/index.ts'
 import { apply as nodeApply } from '../src/index.ts'
 import { OpenInAppAction } from '../src/client/OpenInAppAction.tsx'
 import { en, NS, zh } from '../src/client/locales.ts'
@@ -19,7 +19,7 @@ afterEach(() => {
 })
 
 /** Boot the browser half over a real slot tree that declares the header list. */
-async function bench(): Promise<{ ctx: Context; fiber: ReturnType<Context['plugin']> }> {
+async function bench(config?: Config): Promise<{ ctx: Context; fiber: ReturnType<Context['plugin']> }> {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   ctx.slots.register({
@@ -30,7 +30,7 @@ async function bench(): Promise<{ ctx: Context; fiber: ReturnType<Context['plugi
   } as never, () => null)
   ctx.provide('sessions', {})
   ctx.provide('locale', new LocaleRuntime(ctx))
-  const fiber = ctx.plugin({ inject: [...inject], apply })
+  const fiber = ctx.plugin({ inject: [...inject], apply }, config)
   await fiber.await()
   return { ctx, fiber }
 }
@@ -83,6 +83,15 @@ describe('open-in-app browser half', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ app: 'cursor', path: '/w/dir' }),
     })
+    await fiber.dispose()
+  })
+
+  it('passes a profile choice to hide only the quick-launch button', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ apps: [] }), { status: 200 })))
+    const { ctx, fiber } = await bench({ showPrimaryAction: false })
+    const entry = ctx.slots.entries('conversation.session.header.utilities')[0]
+    const injected = (entry?.inject as unknown as () => OpenInAppActionInjected)()
+    expect(injected.showPrimaryAction).toBe(false)
     await fiber.dispose()
   })
 

@@ -14,12 +14,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
-     * The sidebar-foot trigger row content: icon + label, supplied as slot
-     * content (the accessible name comes from the content — rail state
-     * renders the label visually hidden). The shell renders the button
-     * chrome and owns open state. Absent contribution degrades to an
-     * icon-only button without an accessible name (broken-composition state;
-     * the shipped composition always registers the seat).
+     * The sidebar-foot trigger content: the shipped contribution paints the
+     * gear icon while the shell owns its localized accessible name and open
+     * state. Absent contribution leaves an iconless but still named button
+     * (broken-composition state; the shipped composition always registers
+     * the seat).
      */
     'settings.trigger': { kind: 'single'; scope: 'root'; owner: SettingsTriggerOwnerProps }
     /**

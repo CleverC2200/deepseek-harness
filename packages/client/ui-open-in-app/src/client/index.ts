@@ -7,6 +7,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -27,11 +28,22 @@ export type { OpenInAppActionInjected, OpenInAppActionProps } from './OpenInAppA
 /** Required services for locale registration and the header-slot contribution. */
 export const inject = ['sessions', 'slots', 'locale']
 
+/** Per-profile visibility for the session-header workspace launcher. */
+export interface Config {
+  /** Show the remembered-app quick-launch button beside the application menu. */
+  showPrimaryAction?: boolean
+}
+
+/** Validated open-in-app browser configuration. */
+export const Config: z<Config> = z.object({
+  showPrimaryAction: z.boolean().default(true),
+})
+
 /**
  * Client plugin body: register the dictionaries and the header split button.
  * @param ctx - client root context.
  */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: ClientContext, config: Config = Config({})): void {
   const controller = new OpenInAppController()
   void controller.load()
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'open-in-app: dictionaries')
@@ -48,6 +60,7 @@ export function apply(ctx: ClientContext): void {
       launch: (appId, path) => controller.launch(appId, path),
       choose: (appId) => { controller.choose(appId) },
       iconUrl: appId => `${OPEN_IN_APP_ICON_PREFIX}/${appId}`,
+      showPrimaryAction: config.showPrimaryAction ?? true,
     }),
   }, OpenInAppAction))
 }

@@ -54,6 +54,11 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+.split[data-has-primary-action='false'] .chevron {
+  padding: 5px 7px;
+  border-left: 0;
+}
+
 .icon {
   flex: none;
 }

@@ -385,27 +385,33 @@
   padding-left: 0;
 }
 
-/* Footer seats: additive actions stack above Settings. Each occupant owns its
-   button geometry and hover chrome. */
+/* Footer seats: in the expanded sidebar, optional actions sit immediately
+   left of the right-aligned Settings icon. The rail keeps its vertical
+   sequence, preserving the compact one-control-per-row geometry. */
 .footArea {
   flex: none;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .settingsArea,
 .footerActions {
   flex: none;
   min-width: 0;
-  width: 100%;
+  width: auto;
 }
 
 .footerActions {
   display: flex;
+  align-items: center;
 }
 
 .collapsed .footArea {
+  flex-direction: column;
   align-items: center;
+  gap: 0;
 }
 
 .collapsed .settingsArea,
