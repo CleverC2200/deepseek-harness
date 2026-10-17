@@ -70,7 +70,11 @@ export async function pinBrowserClock(page: Page): Promise<void> {
     globalThis.Date = new Proxy(NativeDate, {
       apply: () => new NativeDate(clock()).toString(),
       construct: (target, args, receiver) => Reflect.construct(target, args.length === 0 ? [clock()] : args, receiver) as Date,
-      get: (target, property, receiver) => property === 'now' ? clock : Reflect.get(target, property, receiver) as unknown,
+      get(target, property, receiver) {
+        if (property === 'now') return clock
+        const value: unknown = Reflect.get(target, property, receiver)
+        return value
+      },
     })
   }, { now: WEB_FIXTURE_TIME, epoch: Math.floor(performance.timeOrigin + performance.now()) })
 }
