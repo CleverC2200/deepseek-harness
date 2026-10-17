@@ -183,4 +183,4 @@ Docs accompany every code change: update affected README and JSDoc contracts tog
 
 `vendor/` packages are pinned source copies (manifest with upstream SHAs in [vendor/README.md](vendor/README.md)). Update via the sync procedure there; re-apply or retire the logged local modifications; rerun `pnpm run test && pnpm run build`.
 
-公司 Core 按[维护约定](.agents/notes/implemented/process/2026-10-17-company-core-source-maintenance.zh.md)留痕。
+[Core 维护](.agents/notes/implemented/process/2026-10-17-company-core-source-maintenance.zh.md)。
