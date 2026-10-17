@@ -1,5 +1,6 @@
 - listitem:
   - button "查看 slow-package": slow-package
+  - text: 1.0.0
   - switch "启用 slow-package" [checked]
 
 [
