@@ -11,6 +11,7 @@ import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-clie
 import { inject } from '../src/client/index.ts'
 import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+import type { createSettingsShellStore } from '../src/client/shell-store.ts'
 import type { DesktopUpdatePresentation } from '../src/types.ts'
 
 const SELF = '@deepseek-ai/dsh-client-ui-settings-general'
@@ -168,6 +169,25 @@ describe('ui-settings-general shell', () => {
     expect(c.ctx.slots.entries('sidebar.settings').map(entry => entry.component)).toEqual([SettingsRoot])
     expect(c.ctx.slots.entries('sidebar.settings')[0]).not.toBe(before)
     for (const name of CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(CHILD_SPECS[name])
+  })
+
+  it('opens a requested section in the shared shell and rebinds navigation after reload', async ({ start }) => {
+    const c = await start()
+    const handle = c.ctx.slots.entries('sidebar.settings')[0]!.store as ReturnType<typeof createSettingsShellStore>
+    const shell = handle.create()
+    expect(handle.create()).toBe(shell)
+    c.ctx.settingsNavigation.open('plugin-manager')
+    expect(shell.getSnapshot()).toEqual({ open: true, activeId: 'plugin-manager' })
+    shell.actions.close()
+    expect(shell.getSnapshot()).toEqual({ open: false, activeId: undefined })
+    await c.reload(SIDEBAR)
+    await c.flush()
+    const nextHandle = c.ctx.slots.entries('sidebar.settings')[0]!.store as ReturnType<typeof createSettingsShellStore>
+    const nextShell = nextHandle.create()
+    expect(nextShell).not.toBe(shell)
+    c.ctx.settingsNavigation.open('models')
+    expect(nextShell.getSnapshot()).toEqual({ open: true, activeId: 'models' })
+    expect(shell.getSnapshot()).toEqual({ open: false, activeId: undefined })
   })
 
   it('unregisters the shell and collapses every child slot when its row unloads', async ({ start }) => {
