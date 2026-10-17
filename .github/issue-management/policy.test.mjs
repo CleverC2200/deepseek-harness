@@ -767,7 +767,7 @@ test('rejects multiple, unknown, legacy, and Issue-source PR labels', () => {
 })
 
 const mockPolicyApi = (t, { pull = {}, requested = true, reviews = [], issues = {}, priority = 'P1', projectError = false } = {}) => {
-  const environment = ['GH_TOKEN', 'GITHUB_TOKEN', 'PROJECT_TOKEN', 'GITHUB_API_URL', 'GITHUB_OUTPUT']
+  const environment = ['GH_TOKEN', 'GITHUB_TOKEN', 'PROJECT_TOKEN', 'GITHUB_API_URL', 'GITHUB_OUTPUT', 'GITHUB_REPOSITORY']
   const previous = new Map(environment.map((key) => [key, process.env[key]]))
   const directory = mkdtempSync(join(tmpdir(), 'dsh-policy-'))
   t.after(() => {
@@ -899,7 +899,7 @@ test('keeps trusted preflight before token minting and required policy unconditi
   assert.ok(source.includes('types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review, review_requested]'))
   const steps = job.split('      - name: ').slice(1)
   assert.equal(steps.length, 4)
-  assert.ok(steps[0].includes('ref: ${{ github.event.repository.default_branch }}'))
+  assert.ok(steps[0].includes('ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}'))
   assert.ok(steps[0].includes('persist-credentials: false'))
   assert.doesNotMatch(source, /pull_request\.head|pull_request_target/)
   assert.ok(steps[1].includes('id: preflight'))
@@ -1074,4 +1074,23 @@ test('allows missing Priority only when resolving Issues are also unprioritized'
       '有 Priority 的解决型 PR 要求每个被解决 Issue 都设置 Priority',
     ),
   )
+})
+
+
+test('fork policy reads its own Issues and retains metadata checks without an upstream Project', async (t) => {
+  const fixture = mockPolicyApi(t, { pull: { body: 'Closes #2' }, issues: { 2: {} } })
+  process.env.GITHUB_REPOSITORY = 'CleverC2200/deepseek-harness'
+  const result = await runPullRequestPreflight({ pull_request: { number: 10 } })
+  assert.deepEqual(result, { eligible: true, needsProject: false })
+  await runPullRequestCheck({ pull_request: { number: 10 } })
+  assert.ok(fixture.requests.every(path => path.startsWith('/repos/CleverC2200/deepseek-harness/')))
+  assert.ok(fixture.requests.includes('/repos/CleverC2200/deepseek-harness/issues/2'))
+  assert.ok(!fixture.requests.includes('/graphql'))
+})
+
+test('fork policy still rejects missing Issue references', async (t) => {
+  const fixture = mockPolicyApi(t, { pull: { body: '' } })
+  process.env.GITHUB_REPOSITORY = 'CleverC2200/deepseek-harness'
+  await assert.rejects(runPullRequestCheck({ pull_request: { number: 10 } }), /Issue policy/)
+  assert.ok(fixture.output.some(line => line.includes('同仓库 Issue')))
 })
