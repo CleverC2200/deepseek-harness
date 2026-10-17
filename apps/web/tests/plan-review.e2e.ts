@@ -1,4 +1,3 @@
-import { openSettings } from './support.ts'
 // Web e2e scenario: the plan-review takeover. The shipped composition mounts
 // plan mode and its client seat, so `/plan <task>` enters plan mode for real
 // and the recorded turn ends on exit_plan_mode blocking against the live
@@ -34,6 +33,7 @@ const APPROVED_EXPECTED = join(SNAPSHOT_DIR, 'approved.expected.md')
 const APPROVED_EXPANDED_EXPECTED = join(SNAPSHOT_DIR, 'approved-expanded.expected.md')
 const TEMPORARY_EXPECTED = fileURLToPath(new URL('./expected/plan-review/temporary.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
+const PANEL_PROFILE = { packages: [{ dir: fileURLToPath(new URL('./fixtures/plugins/fixture-global-panel', import.meta.url)), enabled: true }] }
 
 // One command line: /plan enters plan mode and submits the rest as the turn's
 // message. The task is deliberately self-contained (nothing to explore in a
@@ -53,7 +53,7 @@ describe('web e2e: plan review takeover round trip', () => {
   let reviewedSession: SessionId
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15, compareReplaySession: true })
+    scaffold = await launchWebScaffold(MODE === 'record' ? { profile: PANEL_PROFILE } : { profile: PANEL_PROFILE, replayFixture: FIXTURE, paceMs: 15, compareReplaySession: true })
     scaffold.ctx.on('session/event', (_session, event: SessionEvent) => { sessionEvents.push(event) })
     browser = await chromium.launch()
     // English page: the decision copy is the surface under test, and the
@@ -216,11 +216,11 @@ describe('web e2e: plan review takeover round trip', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plan-review-panel-return'))
     const agent = scaffold.ctx.agents.get(reviewedSession)
     if (agent === undefined) throw new Error('The reviewed Session has no active agent')
-    // The Plugins panel replaces the Conversation and its right Sidebar. The
+    // The global panel replaces the Conversation and its right Sidebar. The
     // review arrives while neither is mounted; returning mounts both in one
     // commit, and the review's automatic open runs before the Sidebar's own
     // effects. A crash there retires the opener for the rest of the page.
-    await openSettings(page, 'en', 'Plugin management')
+    await page.getByRole('button', { name: 'Global panel', exact: true }).click()
     await expect.poll(() => page.locator('[data-composer-input]').count()).toBe(0)
     const crashes: string[] = []
     const onConsole = (message: ConsoleMessage): void => {
@@ -231,7 +231,7 @@ describe('web e2e: plan review takeover round trip', () => {
     const asked = scaffold.ctx.userQuestions.ask({
       agent, signal: controller.signal,
       questions: [{ id: 'off-screen', question: 'Approve this plan?',
-        detail: '# Off-screen review\n\nSubmitted while the Plugins panel was open.',
+        detail: '# Off-screen review\n\nSubmitted while the global panel was open.',
         options: [{ label: 'Approve' }, { label: 'Keep planning' }], intent: { kind: 'plan-review', approve: 'Approve' },
       }],
     })
@@ -244,7 +244,7 @@ describe('web e2e: plan review takeover round trip', () => {
       await card.waitFor({ timeout: 10_000 })
       const preview = page.locator('[data-plan-preview^="dsh-resource://plan-review/"]')
       await preview.waitFor({ state: 'visible', timeout: 10_000 })
-      expect(await preview.getByText('Submitted while the Plugins panel was open.').isVisible()).toBe(true)
+      expect(await preview.getByText('Submitted while the global panel was open.').isVisible()).toBe(true)
       expect(await card.getByRole('button', { name: 'Open plan in sidebar' }).count()).toBe(1)
       expect(await page.locator('[data-slot-error]').count()).toBe(0)
       expect(crashes).toEqual([])
@@ -299,8 +299,8 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Sidebar 
     }
   }
 
-  async function showPlugins(): Promise<void> {
-    await openSettings(page, 'en', 'Plugin management')
+  async function showGlobalPanel(): Promise<void> {
+    await page.getByRole('button', { name: 'Global panel', exact: true }).click()
     await expect.poll(() => page.locator('[data-composer-input]').count(), { timeout: 10_000 }).toBe(0)
   }
 
@@ -340,7 +340,7 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Sidebar 
   }
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({})
+    scaffold = await launchWebScaffold({ profile: PANEL_PROFILE })
     planned = await seedSession(scaffold, await readFile(FIXTURE, 'utf8'), 'plan-review-seat-planned')
     other = await seedSession(scaffold, await readFile(OTHER_FIXTURE, 'utf8'), 'plan-review-seat-other')
     browser = await chromium.launch()
@@ -381,7 +381,7 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Sidebar 
     await page.reload({ waitUntil: 'load' })
     await showSessions()
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
-    await showPlugins()
+    await showGlobalPanel()
     await whileReviewing(planned, '# Layout review\n\nSubmitted to a Session without a saved Sidebar layout.', async () => {
       await row(planned).click()
       await expectOpened('Submitted to a Session without a saved Sidebar layout.')

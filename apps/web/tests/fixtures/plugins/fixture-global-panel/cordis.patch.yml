@@ -1,0 +1,3 @@
+- insert:
+    - id: fixture-global-panel
+      name: '@fixture/global-panel'

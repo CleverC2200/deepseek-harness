@@ -28,7 +28,7 @@ it('guides a newly enabled voice plugin to installation and lets the user postpo
   expect(await dialog.count()).toBe(0)
   await toggle.click()
   await dialog.waitFor()
-  await compareOrRefreshGolden(expected, await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
+  await compareOrRefreshGolden(expected, await captureStableAria(page, '[role="dialog"]:not([data-shortcut-modal="settings"])', scaffold.workspaceCwd), webSnapshotMode())
   await dialog.getByRole('button', { name: 'Later', exact: true }).click()
   await dialog.waitFor({ state: 'hidden' })
   expect(await toggle.getAttribute('aria-checked')).toBe('true')

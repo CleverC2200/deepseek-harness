@@ -369,7 +369,7 @@ describe('web e2e: macOS window drag coverage', () => {
     }
   }, 120_000)
 
-  it('keeps an entry page’s chrome row draggable', async () => {
+  it('keeps plugin settings chrome draggable inside its dialog', async () => {
     const { page, tripwire } = await darwinPage()
     try {
       await openSettings(page, 'en', 'Plugin management')
@@ -382,11 +382,9 @@ describe('web e2e: macOS window drag coverage', () => {
       })
 
       const regions = await collectedRegions(page, INTERACTIVE_SELECTOR)
-      // The row starts at the window's top edge: a page inset above it would be a strip
-      // no drag region covers, which is the dead band at the very top of this page.
-      expect(rect.y, 'the page head starts at the window’s top edge').toBeLessThanOrEqual(0.5)
-      // The page head owns its run, clearance included: that is the entry page's
-      // window strip, with no frame band behind it.
+      const dialog = await rectOf(page, '[data-shortcut-modal="settings"]')
+      expect(rect.y).toBeGreaterThanOrEqual(dialog.y)
+      expect(rect.y + rect.height).toBeLessThanOrEqual(dialog.y + dialog.height)
       expect(
         isDraggableAt(regions, rect.x + 40, rect.y + 8),
         'the plugin manager page head',
@@ -406,7 +404,7 @@ describe('web e2e: macOS window drag coverage', () => {
     }
   }, 120_000)
 
-  it('keeps a detail page’s head row draggable and its body out of the drag surface', async () => {
+  it('keeps plugin details chrome draggable inside its dialog and its body out of the drag surface', async () => {
     const { page, tripwire } = await darwinPage()
     try {
       await openSettings(page, 'en', 'Plugin management')
@@ -435,10 +433,9 @@ describe('web e2e: macOS window drag coverage', () => {
       const { detail: detailRect, head: headRect, viewport } = geometry
       const regions = await collectedRegions(page, INTERACTIVE_SELECTOR)
 
-      // The head's top inset is the window clearance above the crumb: blank, so
-      // it drags like the entry page's head. The row also starts at the window's top
-      // edge, or the strip above it belongs to no drag region.
-      expect(headRect.y, 'the detail head row starts at the window’s top edge').toBeLessThanOrEqual(0.5)
+      const dialog = await rectOf(page, '[data-shortcut-modal="settings"]')
+      expect(headRect.y).toBeGreaterThanOrEqual(dialog.y)
+      expect(headRect.y + headRect.height).toBeLessThanOrEqual(dialog.y + dialog.height)
       expect(
         isDraggableAt(regions, headRect.x + headRect.width / 2, headRect.y + 4),
         'the detail head row’s top inset',
