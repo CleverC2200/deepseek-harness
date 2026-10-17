@@ -74,6 +74,9 @@ export interface PluginActivationOwnerProps {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    'plugins.list.badge': { kind: 'list'; scope: 'root'; owner: PluginDetailProps }
+    'plugins.list.actions': { kind: 'list'; scope: 'root'; owner: PluginDetailProps }
+    'plugins.list.tools': { kind: 'list'; scope: 'root'; owner: { readonly packages: readonly PluginPackageRef[]; readonly registerRefresh: (listener: () => Promise<void>) => () => void } }
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**

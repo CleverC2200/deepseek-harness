@@ -1230,6 +1230,44 @@ describe('desktop main startup', () => {
     await harness.quitCompleted.promise
   })
 
+  it('restarts only after confirmation, folds repeated clicks and uses the existing Host shutdown', async () => {
+    const host = await readyWorkspace()
+    host.inspectQuit.mockResolvedValue({ activeTasks: true, scheduledTasks: false })
+    const pending = Promise.withResolvers<Electron.MessageBoxReturnValue>()
+    harness.dialog.showMessageBox.mockReturnValue(pending.promise)
+    const first = invoke(DESKTOP_IPC.restart, 'app')
+    const second = invoke(DESKTOP_IPC.restart, 'app')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.dialog.showMessageBox).toHaveBeenCalledOnce()
+    expect(harness.app.relaunch).not.toHaveBeenCalled()
+    pending.resolve({ response: 0, checkboxChecked: false })
+    expect(await first).toBe(true)
+    expect(await second).toBe(true)
+    expect(harness.app.relaunch).toHaveBeenCalledOnce()
+    await host.stopping.promise
+    host.exited.resolve()
+    await harness.quitCompleted.promise
+  })
+
+  it('rejects restart from other documents and cancellation leaves no deferred relaunch', async () => {
+    const host = await readyWorkspace()
+    expect(() => invoke(DESKTOP_IPC.restart, 'shell')).toThrow()
+    host.inspectQuit.mockResolvedValue({ activeTasks: true, scheduledTasks: false })
+    harness.dialog.showMessageBox.mockResolvedValue({ response: 1, checkboxChecked: false })
+    const request = invoke(DESKTOP_IPC.restart, 'app')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await request).toBe(false)
+    expect(harness.app.relaunch).not.toHaveBeenCalled()
+    expect(host.stop).not.toHaveBeenCalled()
+    harness.dialog.showMessageBox.mockResolvedValue({ response: 0, checkboxChecked: false })
+    harness.app.quit()
+    await vi.advanceTimersByTimeAsync(0)
+    await host.stopping.promise
+    host.exited.resolve()
+    await harness.quitCompleted.promise
+    expect(harness.app.relaunch).not.toHaveBeenCalled()
+  })
+
   it('asks before quitting when the Host reports interruptible work and cancels without stopping anything', async () => {
     const host = await readyWorkspace()
     const window = harness.windows[0]!

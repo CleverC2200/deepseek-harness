@@ -7,7 +7,10 @@
  * make a stale or undocumented contract fail loudly instead of shipping.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, unlinkSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { collectSlotEntries, oversizedSlotReports, resolveSlotEntries, validateSlotContracts } from './gen-client-catalog.ts'
 import type { SlotDeclaration, SlotRegistration, TypeDeclaration } from './slot-walk.ts'
 
@@ -261,4 +264,27 @@ describe('the real workspace surface', () => {
     expect(tool.ownerPropsReferences).not.toContain('ToolCallCommonProps')
     expect(tool.ownerPropsReferences).not.toContain('ToolCallPhaseProps')
   })
+})
+
+it('reads colocated slot prose without source comments and rejects missing, unknown or duplicate documentation', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-slot-prose-'))
+  onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+  const directory = join(root, 'packages/client/example/src')
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, '../package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-client-example' }))
+  const source = join(directory, 'slots.ts')
+  const code = "declare module '@deepseek-ai/dsh-client-ui-slots' { interface SlotMap { 'root': { kind: 'single'; scope: 'root' }; 'example.cell': { kind: 'list'; scope: 'root'; owner: { value: string } } } }; ctx.slots.register({ name: 'root', children: { 'example.cell': {kind:'list',scope:'root'} } }, Root);"
+  writeFileSync(source, code)
+  const path = join(directory, 'slots.slots.json')
+  const docs = { root: { en:'Application root.',zh:'应用根。' }, 'example.cell': { en:'Contribute a cell. Missing contributions render nothing.',zh:'贡献单元，缺席时不渲染。' } }
+  writeFileSync(path, JSON.stringify(docs))
+  expect(collectSlotEntries(root).find(entry => entry.key === 'example.cell')?.doc).toContain('Contribute a cell.')
+  writeFileSync(path, JSON.stringify({ ...docs, 'missing.cell': { en:'Unknown.',zh:'未知。' } }))
+  expect(() => collectSlotEntries(root)).toThrow('Invalid slot documentation')
+  writeFileSync(path, JSON.stringify(docs))
+  writeFileSync(source, code.replace("'example.cell': { kind:", "\n/** Existing contract. */\n'example.cell': { kind:"))
+  expect(() => collectSlotEntries(root)).toThrow('Duplicate slot documentation')
+  writeFileSync(source, code)
+  unlinkSync(path)
+  expect(() => collectSlotEntries(root)).toThrow('has no JSDoc prose')
 })

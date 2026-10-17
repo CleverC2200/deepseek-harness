@@ -104,6 +104,7 @@ function renderTab(
   const actions = {
     ensure: vi.fn(),
     refresh: vi.fn(),
+    registerRefresh: vi.fn(() => () => {}),
     openInstall: vi.fn(),
     closeInstall: vi.fn(),
     editInstallSpec: vi.fn(),
@@ -136,6 +137,7 @@ function renderTab(
   }
   const navigation = createNavigationStore().create()
   const props: PluginManagerPageProps = {
+    close: vi.fn(),
     useStore: bindSnapshotSelector(navigation), actions: navigation.actions,
     ...standard,
     t,
@@ -158,7 +160,7 @@ function renderTab(
       const body = bodies[`${name}:${opts?.only ?? opts?.entryKey ?? ''}`]
       if (body === undefined) return null
       if (name === 'plugins.bundle.activation') return body('activation', owner)
-      if (name.startsWith('plugins.detail.')) return body('detail', owner)
+      if (name.startsWith('plugins.detail.') || name.startsWith('plugins.list.')) return body('detail', owner)
       if (!('view' in owner) || (owner.view !== 'summary' && owner.view !== 'page')) {
         throw new Error('Plugin configuration fixture requires a summary or page view')
       }
@@ -1846,4 +1848,22 @@ it('supplies the accepted entry values and atomic mutation action to a custom pl
   fireEvent.click(screen.getByText('Custom'))
   fireEvent.click(screen.getByText('Save custom'))
   expect(mutate).toHaveBeenCalledWith([{ op: 'set', path: ['count'], value: 3 }], 7)
+})
+
+it('renders installed update information and actions beside content while preserving official order', () => {
+  const update = vi.fn()
+  renderTab({ packages: [pkg(), pkg({ name: 'official-bundle', installed: false, optional: true })] }, {}, {
+    'plugins.list.badge:': () => <span>New version 0.17.0</span>,
+    'plugins.list.actions:': () => <button onClick={update}>Update package</button>,
+    'plugins.list.tools:': () => <button>Update all packages</button>,
+  })
+  const groups = document.querySelectorAll('[data-plugin-group]')
+  expect([...groups].map(group => group.getAttribute('data-plugin-group'))).toEqual(['official', 'bundles'])
+  expect(within(groups[0] as HTMLElement).queryByText('Update package')).toBeNull()
+  const card = document.querySelector('[data-plugin-package="dsh-better-sidebar"]')!
+  expect(card.querySelector('button[role="switch"]')?.parentElement).toBe(within(card as HTMLElement).getByText('Update package').parentElement)
+  expect(within(card as HTMLElement).getByText('0.16.0')).toBeTruthy()
+  expect(within(card as HTMLElement).getByText('New version 0.17.0')).toBeTruthy()
+  fireEvent.click(within(card as HTMLElement).getByText('Update package'))
+  expect(update).toHaveBeenCalledOnce()
 })

@@ -41,7 +41,7 @@ const CHILD_NAMES = Object.keys(CHILD_SPECS) as Array<keyof typeof CHILD_SPECS>
  * ui-settings-models, ui-settings-plugins, and ui-agent-preset. A plugin
  * adding a section changes this list.
  */
-const PRODUCT_SECTIONS: readonly string[] = ['general', 'models', 'plugins', 'agent-presets']
+const PRODUCT_SECTIONS: readonly string[] = ['general', 'models', 'plugins', 'agent-presets', 'plugin-manager']
 /** Onboarding steps the web-app roster registers, in coordinator order; both come from ui-settings-models. */
 const PRODUCT_ONBOARDING: readonly { id: string; order: number }[] = [
   { id: 'welcome-notice', order: -100 },
@@ -95,7 +95,8 @@ describe('ui-settings-general shell', () => {
     // No order and no label: both projection defaults apply, and order 0 sorts among the product rows.
     c.ctx.slots.register({ name: 'settings.section', id: 'a' } as never, () => null)
     const rows = sections.getSnapshot()
-    expect(rows.at(-1)).toEqual({ id: 'z', order: 1_000, label: 'Z' })
+    expect(rows.find(row => row.id === 'z')).toEqual({ id: 'z', order: 1_000, label: 'Z' })
+    expect(rows.at(-1)?.id).toBe('plugin-manager')
     expect(rows.find(row => row.id === 'a')).toEqual({ id: 'a', order: 0, label: '' })
     expect(rows.map(row => row.order)).toEqual([...rows.map(row => row.order)].sort((x, y) => x - y))
     // Snapshot identity is stable until the ledger moves (uSES contract).

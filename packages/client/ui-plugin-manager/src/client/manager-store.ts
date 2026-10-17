@@ -309,6 +309,7 @@ export interface PluginManagerFace {
   ensure: () => void
   /** Read the Host again. */
   refresh: () => void
+  registerRefresh: (listener: () => Promise<void>) => () => void
   openInstall: () => void
   /** Hide immediately, abort a check, or request cancellation while retaining the Host-owned installation. */
   closeInstall: () => void
@@ -501,6 +502,7 @@ interface InstallRequest {
 export class PluginManagerController {
   private readonly store: SnapshotStore<PluginManagerState>
   private inFlight: Promise<void> | undefined
+  private readonly refreshListeners = new Set<() => Promise<void>>()
   private rerun = false
   private generation = 0
   private disposed = false
@@ -540,6 +542,7 @@ export class PluginManagerController {
 
   /** Stop publishing and drop every late settlement. */
   dispose(): void {
+    this.refreshListeners.clear()
     this.disposed = true
     this.registryRead = undefined
     this.request = undefined
@@ -559,6 +562,10 @@ export class PluginManagerController {
       configForm: id => this.ctx.configForms.get(id),
       ensure: () => { if (this.getSnapshot().status === 'idle') void this.load() },
       refresh: () => { void this.refresh() },
+      registerRefresh: (listener) => {
+        this.refreshListeners.add(listener)
+        return () => { this.refreshListeners.delete(listener) }
+      },
       openInstall: () => {
         this.ctx.get('productAnalytics')?.track('plugin_add_button_click', {})
         const install = this.getSnapshot().install
@@ -741,7 +748,9 @@ export class PluginManagerController {
       ...this.getSnapshot().notice?.kind === 'refresh-failed' ? { notice: null } : {},
     })
     try {
-      await this.load()
+      const extensions = Array.from(this.refreshListeners, listener => Promise.resolve().then(listener))
+      const results = await Promise.allSettled([this.load(), ...extensions])
+      if (results.some(result => result.status === 'rejected')) throw Error('Plugin refresh failed')
     } catch (_error) {
       // A rejected transport request leaves the cached cards available for retry.
       this.patch({ status: 'error' })

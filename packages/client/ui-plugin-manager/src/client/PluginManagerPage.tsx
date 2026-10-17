@@ -37,11 +37,12 @@ import css from './PluginManagerPage.module.css'
 
 /** Full component props assembled by the main slot renderer. */
 export type PluginManagerPageProps =
-  PropsRuntime<'main'>
+  PropsRuntime<'settings.section'>
   & PropsLocale<'pluginManager'>
   & PropsRenderSlots<
     | 'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config' | 'plugins.bundle.activation'
     | 'plugins.detail.actions' | 'plugins.detail.badge' | 'plugins.detail.section'
+    | 'plugins.list.badge' | 'plugins.list.actions' | 'plugins.list.tools'
   >
   & InjectFace<PluginManagerFace>
   & PropsStore<ReturnType<typeof createNavigationStore>>
@@ -379,7 +380,8 @@ function DetailTop({ crumbLabel, crumbText, onBack, icon, actions }: {
 }
 
 /** One package as a card that opens its page: its name, its one-liner, its tags, and its bundle switch. */
-function PackageCard({ pkg, t, resolveText, busy, highlighted, onOpen, onSetEnabled }: {
+function PackageCard({ pkg, t, resolveText, busy, highlighted, onOpen, onSetEnabled, renderSlot }: {
+  readonly renderSlot: RenderConfig
   readonly pkg: PackageView
   readonly t: Translate
   readonly resolveText: ResolveText
@@ -404,12 +406,17 @@ function PackageCard({ pkg, t, resolveText, busy, highlighted, onOpen, onSetEnab
         icon={<PackageArtwork key={pkg.meta?.icon} src={pkg.meta?.icon} />}
         tags={(
           <>
+            {pkg.installed && pkg.version !== undefined ? <Tag className={css.statusTag}>{pkg.version}</Tag> : null}
+            {pkg.installed ? renderSlot('plugins.list.badge', { subject: { kind: 'bundle', pkg: packageRef(pkg) } }) : null}
             {beta ? <Tag className={css.statusTag} tone="info">{t('statusBeta')}</Tag> : null}
             {status === 'problem' ? <Tag className={css.statusTag} tone="danger">{t('statusProblem')}</Tag> : null}
           </>
         )}
         description={description}
-        end={<EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={onSetEnabled} />}
+        end={<>
+          {pkg.installed ? renderSlot('plugins.list.actions', { subject: { kind: 'bundle', pkg: packageRef(pkg) } }) : null}
+          <EnableSwitch pkg={pkg} title={title} t={t} busy={busy} onSetEnabled={onSetEnabled} />
+        </>}
       />
       <MetadataError error={pkg.meta?.error} t={t} />
     </li>
@@ -1304,6 +1311,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       resolveText={resolveText}
       busy={state.busy.includes(pkg.name)}
       highlighted={state.highlight === pkg.name}
+      renderSlot={renderSlot}
       onOpen={() => { setActivation(null); setView({ kind: 'package', name: pkg.name }) }}
       onSetEnabled={(enabled) => { setActivation(enabled ? pkg.name : null); props.setEnabled(pkg.name, enabled) }}
     />
@@ -1323,13 +1331,14 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
         <div className={css.groupHead}>
           <h3 className={css.groupTitle}>{heading}</h3>
           <span className={css.count} data-plugin-count={cards.length}>{cards.length}</span>
+          {id === 'bundles' ? <div className={css.listTools}>{renderSlot('plugins.list.tools', { packages: mine.map(packageRef), registerRefresh: props.registerRefresh })}</div> : null}
         </div>
         <ul className={css.cards}>{cards}</ul>
       </section>
     )
 
   return (
-    <section className={css.page} data-plugin-panel aria-busy={state.status === 'loading' || refreshing}>
+    <section className={`${css.page} ${css.settingsPage}`} data-plugin-panel aria-busy={state.status === 'loading' || refreshing}>
       {showsCards
         ? (
           <header className={css.pageHead} data-window-drag>

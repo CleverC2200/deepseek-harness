@@ -1,0 +1,14 @@
+{
+  "plugins.list.badge": {
+    "en": "Register a cell to add inline status beside an installed bundle title and version. The component receives the same bundle subject as detail contributions. Return null for other packages. Unique ids add cells; reusing an id replaces that cell. No contribution leaves the version alone.",
+    "zh": "注册单元，在已安装组合包的标题与版本旁添加行内状态。组件接收与详情贡献相同的组合包 subject，对其他包返回 null。独立 id 添加单元，复用 id 替换该单元；缺席时仅显示版本。"
+  },
+  "plugins.list.actions": {
+    "en": "Register a cell for an installed bundle action beside its existing switch on the same content row. The component receives the bundle subject and returns null for packages it does not manage. Unique ids add cells; reusing an id replaces that cell. Without a contribution the existing switch remains.",
+    "zh": "注册单元，在已安装组合包原开关旁添加操作，与内容保持同行。组件接收组合包 subject，不管理的包返回 null。独立 id 添加单元，复用 id 替换该单元；缺席时保留原开关。"
+  },
+  "plugins.list.tools": {
+    "en": "Register a cell beside the Installed heading. The component receives installed package references and registerRefresh. Register an asynchronous check in an effect and release its returned disposer on unmount; the existing Refresh control waits for registered checks and inventory reads. Unique ids add cells; reusing an id replaces that cell. Without contributions the heading retains its count alone.",
+    "zh": "注册单元，在已安装标题旁显示工具。组件接收已安装包引用和 registerRefresh。在 effect 中登记异步检查，卸载时调用返回的清理函数；原刷新控件等待登记检查与列表读取。独立 id 添加单元，复用 id 替换该单元；缺席时标题仅保留数量。"
+  }
+}

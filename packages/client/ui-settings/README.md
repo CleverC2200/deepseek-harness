@@ -25,6 +25,8 @@ This package lets web-client features expose editable preferences backed by the 
 <a id="use-this-package"></a>
 ## Use this package
 
+Features open an existing settings section through `ctx.settingsNavigation.open(sectionId)`. The settings shell provides this callback from its existing viewing store; the operation opens Settings without selecting a workspace panel.
+
 Feature plugins use this package to store and edit their preferences without re-implementing transport or schema handling. Mount it once per composition; it injects the `remote` service with its `settings` namespace and owns the single `settings.describe` reader in the browser.
 
 ### Configuration forms

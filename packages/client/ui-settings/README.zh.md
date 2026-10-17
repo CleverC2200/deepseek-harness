@@ -25,6 +25,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+功能通过 `ctx.settingsNavigation.open(sectionId)` 打开已有设置区。设置壳从原查看状态提供此回调，打开设置时不选择工作区主面板。
+
 功能插件用本包存储与编辑自己的偏好设置，而无需重新实现传输层或 schema 处理。每个组合挂载一次即可；它注入 `remote` 服务及其 `settings` 命名空间，并持有浏览器中唯一的 `settings.describe` 读取方。
 
 ### 配置表单
