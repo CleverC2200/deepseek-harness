@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 /** Empty local caches guide explicit enablement to plugin setup without starting installation. */
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser } from 'playwright'
@@ -19,7 +20,7 @@ it('guides a newly enabled voice plugin to installation and lets the user postpo
   resources.browser = browser
   const page = await newEnglishPage(browser), tripwire = watchConsole(page)
   await page.goto(scaffold.authenticatedUrl)
-  await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await openSettings(page, 'en', 'Plugin management')
   const toggle = page.getByRole('switch', { name: 'Enable Voice input', exact: true })
   await toggle.waitFor()
   expect(await toggle.getAttribute('aria-checked')).toBe('false')

@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 /** Optional input contributions mount through the real Loader and preserve editor ownership. */
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser } from 'playwright'
@@ -62,7 +63,7 @@ it('expands an input activity and inserts one undoable result without overwritin
 
 it('offers bundle guidance only after explicit activation and navigates to its configuration', async () => {
   const { page, tripwire } = await fixture(false)
-  await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await openSettings(page, 'en', 'Plugin management')
   const toggle = page.getByRole('switch', { name: 'Enable @fixture/input-extension', exact: true })
   await toggle.waitFor()
   const dialog = page.getByRole('dialog', { name: 'Input plugin setup', exact: true })

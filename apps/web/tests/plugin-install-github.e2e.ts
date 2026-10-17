@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 // Real Git reaches a controlled proxy failure or stall; the browser
 // offers a mirror for a replacement spec, or another way once the install
 // already asks the mirror, without retrying the failed address.
@@ -58,7 +59,7 @@ it.each(['network', 'timeout'] as const)('offers a mirror after a GitHub %s, the
   await page.goto(scaffold.authenticatedUrl)
   await page.waitForSelector('[class*="frame"]')
   if (await page.getByRole('dialog', { name: '设置' }).count() > 0) await page.keyboard.press('Escape')
-  await page.getByRole('navigation', { name: '全局面板' }).getByRole('button', { name: '插件', exact: true }).click()
+  await openSettings(page, 'zh', '插件管理')
   await page.getByRole('button', { name: '添加插件', exact: true }).click()
   const spec = 'https://github.com/example/dsh-plugin.git'
   const title = failure === 'timeout' ? '连接 GitHub 超时' : '无法访问 GitHub'
@@ -69,11 +70,11 @@ it.each(['network', 'timeout'] as const)('offers a mirror after a GitHub %s, the
   await dialog.getByRole('button', { name: '安装', exact: true }).click()
   dialog = page.getByRole('dialog', { name: title, exact: true })
   await dialog.waitFor()
-  expect(await page.getByRole('dialog').count()).toBe(1)
+  expect(await page.getByRole('dialog').count()).toBe(2)
   expect(await dialog.getByText('请尝试其他安装来源。', { exact: true }).count()).toBe(1)
   await compareOrRefreshGolden(
     fileURLToPath(new URL(`./expected/plugin-install-github/${failure === 'timeout' ? 'timeout' : 'failed'}.expected.md`, import.meta.url)),
-    await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode(),
+    await captureStableAria(page, '[role="dialog"]:not([data-shortcut-modal="settings"])', scaffold.workspaceCwd), webSnapshotMode(),
   )
   const attempts = await readFile(join(profile, '.attempts'), 'utf8')
   expect(attempts).toBe('')
@@ -90,7 +91,7 @@ it.each(['network', 'timeout'] as const)('offers a mirror after a GitHub %s, the
   await dialog.getByRole('button', { name: '安装源 中国大陆镜像源', exact: true }).waitFor()
   await compareOrRefreshGolden(
     fileURLToPath(new URL('./expected/plugin-install-github/mirror.expected.md', import.meta.url)),
-    await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode(),
+    await captureStableAria(page, '[role="dialog"]:not([data-shortcut-modal="settings"])', scaffold.workspaceCwd), webSnapshotMode(),
   )
   expect(await readFile(join(profile, '.attempts'), 'utf8')).toBe(attempts)
   expect(connections).toBe(checked)
@@ -101,7 +102,7 @@ it.each(['network', 'timeout'] as const)('offers a mirror after a GitHub %s, the
   await dialog.waitFor()
   await compareOrRefreshGolden(
     fileURLToPath(new URL(`./expected/plugin-install-github/${failure === 'timeout' ? 'timeout' : 'failed'}-on-mirror.expected.md`, import.meta.url)),
-    await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode(),
+    await captureStableAria(page, '[role="dialog"]:not([data-shortcut-modal="settings"])', scaffold.workspaceCwd), webSnapshotMode(),
   )
   await dialog.getByRole('button', { name: '试试其他方式', exact: true }).click()
   dialog = page.getByRole('dialog', { name: '添加插件', exact: true })
@@ -110,7 +111,7 @@ it.each(['network', 'timeout'] as const)('offers a mirror after a GitHub %s, the
   expect(await input.evaluate(element => element === document.activeElement)).toBe(true)
   await compareOrRefreshGolden(
     fileURLToPath(new URL('./expected/plugin-install-github/another-way.expected.md', import.meta.url)),
-    await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode(),
+    await captureStableAria(page, '[role="dialog"]:not([data-shortcut-modal="settings"])', scaffold.workspaceCwd), webSnapshotMode(),
   )
   await input.fill(spec)
   await dialog.getByRole('button', { name: '安装', exact: true }).click()

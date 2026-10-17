@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 // A real Host/Remote/browser composition with a controllable package-manager process:
 // the dialog offers the configured registries, the check asks them in turn while one
 // is unreachable, and an install that loses its registry mid-run moves on to the next.
@@ -64,10 +65,10 @@ it.each(['https://registry.npmjs.org/', MIRROR])('selects the fastest responding
       await page.goto(scaffold.authenticatedUrl)
       await page.waitForSelector('[class*="frame"]')
       if (await page.getByRole('dialog', { name: '设置' }).count() > 0) await page.keyboard.press('Escape')
-      await page.getByRole('navigation', { name: '全局面板' }).getByRole('button', { name: '插件', exact: true }).click()
+      await openSettings(page, 'zh', '插件管理')
       const panel = page.locator('[data-plugin-panel]')
       await panel.getByRole('button', { name: '添加插件', exact: true }).click()
-      const dialog = page.getByRole('dialog')
+      const dialog = page.locator('[role="dialog"]:not([data-shortcut-modal="settings"])')
       // Folded, the registry control names pnpm's own registry; unfolded, its options float from it and offer the configured
       // mirror and a typed address.
       const registryToggle = dialog.getByRole('button', { name: winner === MIRROR ? '安装源 中国大陆镜像源' : '安装源 npm 官方源', exact: true })
@@ -118,14 +119,14 @@ it.each(['https://registry.npmjs.org/', MIRROR])('selects the fastest responding
       await dialog.getByText('第 1 次 · 中国大陆镜像源', { exact: true }).waitFor()
       await dialog.getByText('第 2 次 · npm 官方源', { exact: true }).waitFor()
       expect(JSON.parse(await readFile(manifestPath, 'utf8'))).toMatchObject({ dependencies: { 'mirrored-package': '2.0.0' } })
-      const installed = (await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd))
+      const installed = (await captureStableAria(page, '[role="dialog"]:not([data-shortcut-modal="settings"])', scaffold.workspaceCwd))
         .split(process.execPath).join('{{node}}')
         .split(scaffold.harnessHome).join('{{harnessHome}}')
       await compareOrRefreshGolden(fileURLToPath(new URL('./expected/plugin-install-registry/installed.expected.md', import.meta.url)), installed, webSnapshotMode())
       // The dialog opened again starts from the registry picked for the last install.
       await dialog.getByRole('button', { name: '立即启用', exact: true }).click()
       await panel.getByRole('button', { name: '添加插件', exact: true }).click()
-      await page.getByRole('dialog').getByRole('button', { name: '安装源 中国大陆镜像源', exact: true }).waitFor()
+      await page.locator('[role="dialog"]:not([data-shortcut-modal="settings"])').getByRole('button', { name: '安装源 中国大陆镜像源', exact: true }).waitFor()
       expect(tripwire.pageErrors).toEqual([])
     } finally { await browser.close() }
   } finally {

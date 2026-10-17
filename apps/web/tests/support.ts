@@ -322,12 +322,17 @@ export function conversationContextKey(kind: string, id: string): string {
  * @param page - browser page with the mounted sidebar.
  * @param locale - current UI language.
  */
-export async function openSettings(page: Page, locale: 'en' | 'zh'): Promise<void> {
+export async function openSettings(page: Page, locale: 'en' | 'zh', section?: string): Promise<void> {
   const label = locale === 'zh' ? '设置' : 'Settings'
+  if (await page.getByRole('dialog', { name: label, exact: true }).count() > 0) {
+    if (section) await page.getByRole('dialog', { name: label, exact: true }).getByRole('button', { name: section, exact: true }).click()
+    return
+  }
   if (await page.evaluate(() => 'dshDesktop' in globalThis)) {
     await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
     await page.getByRole('menuitem', { name: label, exact: true }).click()
   } else {
     await page.getByRole('button', { name: label, exact: true }).click()
   }
+  if (section) await page.getByRole('dialog', { name: label, exact: true }).getByRole('button', { name: section, exact: true }).click()
 }

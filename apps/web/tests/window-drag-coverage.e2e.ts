@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 // Browser coverage for the macOS window drag surface: which chrome rows drag,
 // which pixels stay content, and that no control is swallowed by the band.
 //
@@ -371,7 +372,7 @@ describe('web e2e: macOS window drag coverage', () => {
   it('keeps an entry page’s chrome row draggable', async () => {
     const { page, tripwire } = await darwinPage()
     try {
-      await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+      await openSettings(page, 'en', 'Plugin management')
       const head = page.locator('[class*="pageHead"]').first()
       await head.waitFor({ timeout: 15_000 })
       await settled(page)
@@ -408,7 +409,7 @@ describe('web e2e: macOS window drag coverage', () => {
   it('keeps a detail page’s head row draggable and its body out of the drag surface', async () => {
     const { page, tripwire } = await darwinPage()
     try {
-      await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+      await openSettings(page, 'en', 'Plugin management')
       const cards = page.locator('[data-plugin-package], [data-plugin-item]')
       await cards.first().waitFor({ timeout: 30_000 })
       await settled(page)

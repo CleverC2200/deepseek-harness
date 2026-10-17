@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 // Web e2e scenario: the configuration pages on the Plugins page — the official
 // pages a deployment's exposed host-plane namespaces produce, one field edited
 // through the real wire down to `$DSH_HOME/cordis.patch.yml`, the override badge
@@ -62,7 +63,7 @@ describe('web e2e: plugin configuration pages', () => {
       await page.keyboard.press('Escape')
       await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
     }
-    await page.getByRole('navigation', { name: '全局面板' }).getByRole('button', { name: '插件', exact: true }).click()
+    await openSettings(page, 'zh', '插件管理')
     const panel = page.locator('[data-plugin-panel]')
     await panel.waitFor({ timeout: 10_000 })
     while (await panel.getByRole('button', { name: /^返回/ }).count() > 0) {

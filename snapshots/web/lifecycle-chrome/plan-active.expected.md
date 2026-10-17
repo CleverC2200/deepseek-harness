@@ -1,8 +1,6 @@
 - button "New session"
 - button "Collapse sidebar"
 - button "New session": New Session
-- navigation "Global panels":
-  - button "Plugins"
 - text: Workspaces
 - button "Search sessions"
 - textbox "Search session names"

@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 // Web e2e scenario: the plan-review takeover. The shipped composition mounts
 // plan mode and its client seat, so `/plan <task>` enters plan mode for real
 // and the recorded turn ends on exit_plan_mode blocking against the live
@@ -219,7 +220,7 @@ describe('web e2e: plan review takeover round trip', () => {
     // review arrives while neither is mounted; returning mounts both in one
     // commit, and the review's automatic open runs before the Sidebar's own
     // effects. A crash there retires the opener for the rest of the page.
-    await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+    await openSettings(page, 'en', 'Plugin management')
     await expect.poll(() => page.locator('[data-composer-input]').count()).toBe(0)
     const crashes: string[] = []
     const onConsole = (message: ConsoleMessage): void => {
@@ -299,7 +300,7 @@ describe.skipIf(MODE === 'record')('web e2e: pending plan review across Sidebar 
   }
 
   async function showPlugins(): Promise<void> {
-    await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+    await openSettings(page, 'en', 'Plugin management')
     await expect.poll(() => page.locator('[data-composer-input]').count(), { timeout: 10_000 }).toBe(0)
   }
 
