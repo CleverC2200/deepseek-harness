@@ -231,7 +231,7 @@ describe('CI workflow', () => {
     }
 
     expect(windowsCoverage.name).toBe('windows node 24 / coverage')
-    expect(windowsCoverage.env).toMatchObject({ DSH_COVERAGE_PARTITIONS: "${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '4' || '' }}" })
+    expect(windowsCoverage.env).toMatchObject({ DSH_COVERAGE_PARTITIONS: "${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '4' || github.repository != 'deepseek-harness/deepseek-harness' && '2' || '' }}" })
     const coverageSteps = windowsCoverage.steps as unknown[]
     const coverageCommands = coverageSteps.filter((step): step is Record<string, unknown> & { run: string } => (
       isRecord(step) && typeof step.run === 'string'
@@ -268,7 +268,7 @@ describe('CI workflow', () => {
       'timeout-minutes': 15,
       env: {
         DSH_GATE_FAIL_FAST: '',
-        DSH_PUBLINT_CONCURRENCY: "${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '8' || '' }}",
+        DSH_PUBLINT_CONCURRENCY: "${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '8' || github.repository != 'deepseek-harness/deepseek-harness' && '2' || '' }}",
       },
     })
     expect(observational?.if).toBeUndefined()
@@ -365,11 +365,11 @@ describe('CI workflow', () => {
       linuxAggregate: aggregate['runs-on'] as string,
       windows: windowsBuild['runs-on'] as string,
     }
-    const evaluate = (expression: string, vars: Record<string, string>, login = 'maintainer'): unknown => {
+    const evaluate = (expression: string, vars: Record<string, string>, login = 'maintainer', repository = 'deepseek-harness/deepseek-harness'): unknown => {
       return evaluateRunsOn(expression, {
         vars,
         fromJSON: JSON.parse,
-        github: { event: { pull_request: { user: { login } } } },
+        github: { repository, event: { pull_request: { user: { login } } } },
       })
     }
     for (const [name, selector, variable, pool, hosted] of [
@@ -384,6 +384,20 @@ describe('CI workflow', () => {
       expect(evaluate(selector, { [variable]: 'selfhosted' }, 'dependabot[bot]'), `${name} dependabot on selfhosted`).toBe(hosted)
       for (const mode of ['', 'hosted', 'unexpected']) {
         expect(evaluate(selector, { [variable]: mode }), `${name} default on ${mode}`).toBe(hosted)
+      }
+      const forkHosted = name === 'linux gates' ? 'ubuntu-24.04' : name === 'windows lanes' ? 'windows-2025' : hosted
+      expect(evaluate(selector, {}, 'maintainer', 'CleverC2200/deepseek-harness')).toBe(forkHosted)
+      expect(evaluate(selector, { [variable]: 'selfhosted' }, 'maintainer', 'CleverC2200/deepseek-harness')).toEqual(pool)
+      expect(evaluate(selector, { [variable]: 'blacksmith' }, 'maintainer', 'CleverC2200/deepseek-harness')).toMatch(/^blacksmith-/)
+    }
+    for (const [job, variable] of [[node24Coverage, 'DSH_CI_FAILOVER_LINUX'], [windowsCoverage, 'DSH_CI_FAILOVER_WINDOWS']] as const) {
+      if (!isRecord(job.env)) throw new TypeError('Coverage job must declare resource settings')
+      for (const [name, selfhosted] of [['DSH_COVERAGE_MAX_WORKERS', '6'], ['DSH_COVERAGE_PARTITIONS', '4'], ['DSH_GATE_CONCURRENCY', '3']] as const) {
+        const expression = job.env[name]
+        if (typeof expression !== 'string') throw new TypeError('Coverage setting must be an expression')
+        expect(evaluate(expression, {})).toBe('')
+        expect(evaluate(expression, {}, 'maintainer', 'CleverC2200/deepseek-harness')).toBe('2')
+        expect(evaluate(expression, { [variable]: 'selfhosted' })).toBe(selfhosted)
       }
     }
 

@@ -90,7 +90,9 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
   }
   const probe = { fastest: overrides.fastest ?? vi.fn(() => Promise.resolve(ok(null))) }
   const track = vi.fn()
+  const refreshExtensions = vi.fn(async () => {})
   const ctx = {
+    parallel: refreshExtensions,
     get: () => ({ enabled, track }),
     configForms: { describe: () => ({ getSnapshot: () => ({ view: { namespaces: [] } }), subscribe: () => () => {} }), get: vi.fn((id: string) => `form:${id}`) },
     remote: { pluginManager: plugins, pluginInventory: inventory, pluginRegistryProbe: probe },
@@ -104,7 +106,7 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
     await vi.waitFor(() => { expect(state().install.phase).toBe('starting') })
     return state().install.requestId as PluginInstallRequestId
   }
-  return { plugins, inventory, probe, controller, face, state, started, track }
+  return { plugins, inventory, probe, controller, face, state, started, track, refreshExtensions }
 }
 
 it('hands a custom page the shared configuration form of its entry', () => {
@@ -1797,4 +1799,20 @@ it('reports a successful install with only documented result fields', async () =
   expect(results).toEqual([['install_plugin_result', {
     input_value: 'dsh-new', is_success: true, duration: expect.any(Number) as number, plugin_name: 'dsh-new',
   }]])
+})
+
+it('manual refresh waits for the registered company check and coalesces repeated clicks', async () => {
+  const b = bench()
+  const gate = deferred<undefined>()
+  const listener = vi.fn(() => gate.promise)
+  const release = b.face.registerRefresh(listener)
+  b.face.ensure()
+  await vi.waitFor(() => { expect(b.state().status).toBe('ready') })
+  b.face.refresh()
+  b.face.refresh()
+  await vi.waitFor(() => { expect(listener).toHaveBeenCalledOnce() })
+  expect(b.state().refreshStatus).toBe('refreshing')
+  gate.resolve(undefined)
+  await vi.waitFor(() => { expect(b.state().refreshStatus).toBe('idle') })
+  release()
 })

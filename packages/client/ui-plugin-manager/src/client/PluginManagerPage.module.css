@@ -1367,3 +1367,19 @@ label.registryOption {
   color: var(--dsw-alias-state-error-primary);
   overflow-wrap: anywhere;
 }
+
+.settingsPage {
+  height: auto;
+  overflow: visible;
+  padding: 0 0 24px;
+}
+
+.settingsPage .pageHead {
+  padding-top: 0;
+}
+
+.listTools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}

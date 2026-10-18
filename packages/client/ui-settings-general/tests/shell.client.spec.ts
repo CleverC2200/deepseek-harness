@@ -11,6 +11,7 @@ import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-clie
 import { inject } from '../src/client/index.ts'
 import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+import type { createSettingsShellStore } from '../src/client/shell-store.ts'
 import type { DesktopUpdatePresentation } from '../src/types.ts'
 
 const SELF = '@deepseek-ai/dsh-client-ui-settings-general'
@@ -41,7 +42,7 @@ const CHILD_NAMES = Object.keys(CHILD_SPECS) as Array<keyof typeof CHILD_SPECS>
  * ui-settings-models, ui-settings-plugins, and ui-agent-preset. A plugin
  * adding a section changes this list.
  */
-const PRODUCT_SECTIONS: readonly string[] = ['general', 'models', 'plugins', 'agent-presets']
+const PRODUCT_SECTIONS: readonly string[] = ['general', 'models', 'plugins', 'agent-presets', 'plugin-manager']
 /** Onboarding steps the web-app roster registers, in coordinator order; both come from ui-settings-models. */
 const PRODUCT_ONBOARDING: readonly { id: string; order: number }[] = [
   { id: 'welcome-notice', order: -100 },
@@ -95,7 +96,8 @@ describe('ui-settings-general shell', () => {
     // No order and no label: both projection defaults apply, and order 0 sorts among the product rows.
     c.ctx.slots.register({ name: 'settings.section', id: 'a' } as never, () => null)
     const rows = sections.getSnapshot()
-    expect(rows.at(-1)).toEqual({ id: 'z', order: 1_000, label: 'Z' })
+    expect(rows.find(row => row.id === 'z')).toEqual({ id: 'z', order: 1_000, label: 'Z' })
+    expect(rows.at(-1)?.id).toBe('plugin-manager')
     expect(rows.find(row => row.id === 'a')).toEqual({ id: 'a', order: 0, label: '' })
     expect(rows.map(row => row.order)).toEqual([...rows.map(row => row.order)].sort((x, y) => x - y))
     // Snapshot identity is stable until the ledger moves (uSES contract).
@@ -167,6 +169,25 @@ describe('ui-settings-general shell', () => {
     expect(c.ctx.slots.entries('sidebar.settings').map(entry => entry.component)).toEqual([SettingsRoot])
     expect(c.ctx.slots.entries('sidebar.settings')[0]).not.toBe(before)
     for (const name of CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(CHILD_SPECS[name])
+  })
+
+  it('opens a requested section in the shared shell and rebinds navigation after reload', async ({ start }) => {
+    const c = await start()
+    const handle = c.ctx.slots.entries('sidebar.settings')[0]!.store as ReturnType<typeof createSettingsShellStore>
+    const shell = handle.create()
+    expect(handle.create()).toBe(shell)
+    c.ctx.settingsNavigation.open('plugin-manager')
+    expect(shell.getSnapshot()).toEqual({ open: true, activeId: 'plugin-manager' })
+    shell.actions.close()
+    expect(shell.getSnapshot()).toEqual({ open: false, activeId: undefined })
+    await c.reload(SIDEBAR)
+    await c.flush()
+    const nextHandle = c.ctx.slots.entries('sidebar.settings')[0]!.store as ReturnType<typeof createSettingsShellStore>
+    const nextShell = nextHandle.create()
+    expect(nextShell).not.toBe(shell)
+    c.ctx.settingsNavigation.open('models')
+    expect(nextShell.getSnapshot()).toEqual({ open: true, activeId: 'models' })
+    expect(shell.getSnapshot()).toEqual({ open: false, activeId: undefined })
   })
 
   it('unregisters the shell and collapses every child slot when its row unloads', async ({ start }) => {

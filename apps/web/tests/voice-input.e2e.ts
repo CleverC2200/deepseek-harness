@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 /** Browser dictation submits only reviewed text through the ordinary recorded Session flow. */
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -120,11 +121,14 @@ it.skipIf(webSnapshotMode() === 'record')('guides voice setup, records from stan
   expect(recognize).not.toHaveBeenCalled()
   preparation = { phase: 'standby' }
   for (const listener of readinessListeners) listener()
+  await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Close', exact: true }).click()
   await page.getByRole('button', { name: 'New session', exact: true }).filter({ hasText: 'New Session' }).click()
   await mic.waitFor()
-  await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await openSettings(page, 'en', 'Plugin management')
+  await page.getByRole('button', { name: 'Back to plugins', exact: true }).click()
   await page.locator('[data-plugin-package="@deepseek-ai/dsh-experimental-voice-input-bundle"]').waitFor()
   expect(await page.locator('[data-plugin-detail]').count()).toBe(0)
+  await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Close', exact: true }).click()
   await page.getByRole('button', { name: 'New session', exact: true }).filter({ hasText: 'New Session' }).click()
   await mic.waitFor()
   const micBox = await mic.boundingBox(), modelBox = await page.getByRole('button', { name: /^Select model, current/ }).boundingBox()

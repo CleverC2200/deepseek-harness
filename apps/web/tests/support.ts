@@ -42,7 +42,6 @@ export const ZH_BROWSER_LOCALE = 'zh-CN'
 export const WEB_FIXTURE_TIME = Date.parse('2026-01-15T12:00:00+08:00')
 
 /** How often a pinned browser clock advances, in milliseconds. */
-const PINNED_CLOCK_STEP_MS = 250
 
 /**
  * Pin the Host clock to the shared fixture day for one scenario suite.
@@ -64,32 +63,20 @@ export function pinHostClock(): MockInstance<typeof Date.now> {
     WEB_FIXTURE_TIME + Math.floor(performance.now() - startedAt))
 }
 
-/**
- * Pin a scenario page's clock to the shared fixture day, advancing with real
- * time. Pair it with {@link pinHostClock} for a scenario that stamps its own
- * message times, and with `seedSession`'s `createdAt` for a seeded one.
- *
- * The frozen instant is re-applied from the anchor on an interval rather than
- * left at one value, because product logic reads two `Date.now()` values to
- * decide a minimum display hold or a deadline window; a permanently frozen
- * clock stops supplying elapsed time, so a title that owes its golden settled
- * text keeps rendering its previous one. Both clocks therefore advance at the
- * real rate and stay within one step of each other.
- * @param page - page whose clock is pinned.
- * @returns the disposer that stops re-pinning; call it in teardown.
- */
-export async function pinBrowserClock(page: Page): Promise<() => void> {
-  const startedAt = Date.now()
-  const step = async (): Promise<void> => {
-    try {
-      await page.clock.setFixedTime(WEB_FIXTURE_TIME + (Date.now() - startedAt))
-    } catch {
-      // The page closed under the interval; teardown owns the last word.
-    }
-  }
-  await step()
-  const timer = setInterval(() => { void step() }, PINNED_CLOCK_STEP_MS)
-  return () => { clearInterval(timer) }
+export async function pinBrowserClock(page: Page): Promise<void> {
+  await page.addInitScript(({ now, epoch }) => {
+    const NativeDate = Date
+    const clock = () => now + Math.floor(NativeDate.now() - epoch)
+    globalThis.Date = new Proxy(NativeDate, {
+      apply: () => new NativeDate(clock()).toString(),
+      construct: (target, args, receiver) => Reflect.construct(target, args.length === 0 ? [clock()] : args, receiver) as Date,
+      get(target, property, receiver) {
+        if (property === 'now') return clock
+        const value: unknown = Reflect.get(target, property, receiver)
+        return value
+      },
+    })
+  }, { now: WEB_FIXTURE_TIME, epoch: Math.floor(performance.timeOrigin + performance.now()) })
 }
 
 /**
@@ -322,12 +309,17 @@ export function conversationContextKey(kind: string, id: string): string {
  * @param page - browser page with the mounted sidebar.
  * @param locale - current UI language.
  */
-export async function openSettings(page: Page, locale: 'en' | 'zh'): Promise<void> {
+export async function openSettings(page: Page, locale: 'en' | 'zh', section?: string): Promise<void> {
   const label = locale === 'zh' ? '设置' : 'Settings'
+  if (await page.getByRole('dialog', { name: label, exact: true }).count() > 0) {
+    if (section) await page.getByRole('dialog', { name: label, exact: true }).getByRole('button', { name: section, exact: true }).click()
+    return
+  }
   if (await page.evaluate(() => 'dshDesktop' in globalThis)) {
     await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
     await page.getByRole('menuitem', { name: label, exact: true }).click()
   } else {
     await page.getByRole('button', { name: label, exact: true }).click()
   }
+  if (section) await page.getByRole('dialog', { name: label, exact: true }).getByRole('button', { name: section, exact: true }).click()
 }

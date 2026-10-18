@@ -12,7 +12,7 @@
  * `--check` verifies the committed artifact is fresh.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import ts from 'typescript'
 import {
@@ -123,6 +123,29 @@ export interface SlotEntry {
   readonly source: string
 }
 
+function documentedSlotDeclarations(file: ScannedFile): SlotDeclaration[] {
+  const declarations = slotDeclarations(file)
+  const path = file.sf.fileName.replace(/\.tsx?$/, '.slots.json')
+  if (!existsSync(path)) return declarations
+  const raw: unknown = JSON.parse(readFileSync(path, 'utf8'))
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw Error(`Invalid slot documentation: ${path}`)
+  const docs = new Map<string, string>()
+  for (const [key, rawValue] of Object.entries(raw)) {
+    const value: unknown = rawValue
+    if (!declarations.some(entry => entry.key === key) || typeof value !== 'object' || value === null || Array.isArray(value)
+      || !('en' in value) || typeof value.en !== 'string' || !value.en.trim()
+      || !('zh' in value) || typeof value.zh !== 'string' || !value.zh.trim()
+      || Object.keys(value).some(locale => locale !== 'en' && locale !== 'zh')) throw Error(`Invalid slot documentation: ${path}#${key}`)
+    docs.set(key, value.en)
+  }
+  return declarations.map((entry) => {
+    const doc = docs.get(entry.key)
+    if (doc === undefined) return entry
+    if (entry.jsDoc.trim()) throw Error(`Duplicate slot documentation: ${path}#${entry.key}`)
+    return { ...entry, jsDoc: doc }
+  })
+}
+
 /**
  * Read the workspace and resolve every catalog entry, failing loud on a
  * contract the catalog cannot teach.
@@ -132,7 +155,7 @@ export interface SlotEntry {
  */
 export function collectSlotEntries(scanRoot: string): SlotEntry[] {
   const files = scanSlotFiles(scanRoot, SOURCE_GLOBS)
-  const declarations = files.flatMap(file => slotDeclarations(file))
+  const declarations = files.flatMap(file => documentedSlotDeclarations(file))
   const registrations = files.flatMap(file => slotRegistrations(file))
   const types = indexExportedTypes(scanRoot, SOURCE_GLOBS)
   const problems = validateSlotContracts(declarations, registrations, types)

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-17-company-core-source-maintenance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-17-company-core-source-maintenance.md
+/agent-note-company-core-source-maintenance:
+  en: 2452a09a2d34207c
+  zh: 87326edfda29274d
+/agent-note-company-core-source-maintenance/problem:
+  en: 0cbeb6a3eb363e5e
+  zh: 42e7de424c32e4d2
+/agent-note-company-core-source-maintenance/decision:
+  en: 179a61d8b99cf1db
+  zh: dcf3e0fed03be4b9
+/agent-note-company-core-source-maintenance/decision/baselines-and-upgrades:
+  en: 84715c8475f32786
+  zh: 858c89b879c85d16
+/agent-note-company-core-source-maintenance/decision/querying-a-difference:
+  en: 76a712c50aa8dcd5
+  zh: e0b4f39c535437c1
+/agent-note-company-core-source-maintenance/alternatives-considered:
+  en: 3862f7469a0bfccd
+  zh: 92d42a7119dca9ef
+/agent-note-company-core-source-maintenance/consequences:
+  en: 9efcb633f5286319
+  zh: a77a658f8106b4c8
+/agent-note-company-core-source-maintenance/related:
+  en: 93519ebcc4cfc1fb
+  zh: 05260097ccbd9518

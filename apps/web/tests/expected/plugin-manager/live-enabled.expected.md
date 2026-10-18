@@ -39,8 +39,9 @@
 - list:
   - listitem:
     - button "查看 @fixture/bundle": "@fixture/bundle"
-    - text: Registry description for the fixture bundle.
+    - text: 0.0.1 Registry description for the fixture bundle.
     - switch "启用 @fixture/bundle" [checked]
   - listitem:
     - button "查看 dsh-web-scaffold-defaults": dsh-web-scaffold-defaults
+    - text: 1.0.0
     - switch "启用 dsh-web-scaffold-defaults" [checked]

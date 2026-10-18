@@ -1,3 +1,4 @@
+import { openSettings } from './support.ts'
 /** The real local provider publishes actionable download failures through the speech Remote to bundle details. */
 import { once } from 'node:events'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -42,7 +43,7 @@ it('shows the failed asset, actual download source and recovery advice, then ret
   resources.browser = browser
   const page = await newEnglishPage(browser), tripwire = watchConsole(page)
   await page.goto(scaffold.authenticatedUrl)
-  await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await openSettings(page, 'en', 'Plugin management')
   await page.locator('[data-plugin-package="@deepseek-ai/dsh-experimental-voice-input-bundle"]').getByRole('button').click()
   await page.getByRole('button', { name: 'Download and prepare', exact: true }).click()
   const alert = page.getByRole('alert')
@@ -102,7 +103,7 @@ it.each([{ winner: 0, manual: false }, { winner: 1, manual: false }, { winner: 0
     const browser = await chromium.launch(); resources.browser = browser
     const page = await newEnglishPage(browser), tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl)
-    await page.getByRole('button', { name: 'Plugins', exact: true }).click()
+    await openSettings(page, 'en', 'Plugin management')
     await page.locator('[data-plugin-package="@deepseek-ai/dsh-experimental-voice-input-bundle"]').getByRole('button').click()
     const picker = page.getByLabel('Model download source', { exact: true })
     await picker.waitFor()

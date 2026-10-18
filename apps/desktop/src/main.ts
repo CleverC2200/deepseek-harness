@@ -1256,6 +1256,18 @@ async function main(): Promise<void> {
       platformView.dispose().catch((error: unknown) => { console.error(error) })])
       .catch((error: unknown) => { console.error(error) }).finally(() => { app.quit() })
   }
+  let restartRequest: Promise<boolean> | undefined
+  ipcMain.handle(DESKTOP_IPC.restart, (event) => {
+    assertProductSender(event)
+    if (quitting || shuttingDown || shellInstallerOwnsQuit) return false
+    restartRequest ??= quitConfirmation.confirm().then((approved) => {
+      if (!approved || quitting || shuttingDown || shellInstallerOwnsQuit) return false
+      app.relaunch()
+      finishQuit()
+      return true
+    }).finally(() => { restartRequest = undefined })
+    return restartRequest
+  })
   app.on('before-quit', (event) => {
     if (shellInstallerOwnsQuit) {
       shuttingDown = true

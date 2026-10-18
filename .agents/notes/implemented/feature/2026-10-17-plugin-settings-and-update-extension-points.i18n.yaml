@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-17-plugin-settings-and-update-extension-points.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-17-plugin-settings-and-update-extension-points.md
+/agent-note-plugin-settings-and-update-extension-points:
+  en: 191be2c9dbe340b0
+  zh: 3ae7d9f8a739392f
+/agent-note-plugin-settings-and-update-extension-points/problem:
+  en: 149f160eb53e4918
+  zh: 17207af2b95e825e
+/agent-note-plugin-settings-and-update-extension-points/decision:
+  en: 87b8e35a6a051f28
+  zh: 950ab8ba1bca8989
+/agent-note-plugin-settings-and-update-extension-points/alternatives-considered:
+  en: e3e12f65ff2322a2
+  zh: eb6537e31130829a
+/agent-note-plugin-settings-and-update-extension-points/consequences:
+  en: d055fccb21a179a2
+  zh: bad91adae5ea8561
+/agent-note-plugin-settings-and-update-extension-points/verification:
+  en: e4cd50c980dddf42
+  zh: f63bee9e70cd709d

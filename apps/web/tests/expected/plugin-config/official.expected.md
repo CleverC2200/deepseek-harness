@@ -39,7 +39,9 @@
 - list:
   - listitem:
     - button "查看 @fixture/live-client": "@fixture/live-client"
+    - text: 0.0.1
     - switch "启用 @fixture/live-client"
   - listitem:
     - button "查看 dsh-web-scaffold-defaults": dsh-web-scaffold-defaults
+    - text: 1.0.0
     - switch "启用 dsh-web-scaffold-defaults" [checked]

@@ -1,0 +1,69 @@
+- heading "Plugins" [level=1]
+- text: Install, enable, and configure plugins
+- button "About plugins"
+- button "Refresh"
+- button "Add plugin"
+- heading "Official" [level=3]
+- text: "8"
+- list:
+  - listitem:
+    - button "View Agent Teams": Agent Teams
+    - text: Experimental Enable team collaboration, team tools, the member roster, and the shared task board.
+    - switch "Enable Agent Teams"
+  - listitem:
+    - button "View Auto Authorization Review": Auto Authorization Review
+    - text: Experimental Add an Auto review permission mode that uses the model to assess authorization before each tool call.
+    - switch "Enable Auto Authorization Review"
+  - listitem:
+    - button "View Automation tasks": Automation tasks
+    - text: Experimental Run tasks in your sessions at a set time or on a repeating schedule.
+    - switch "Enable Automation tasks"
+  - listitem:
+    - button "View Voice input": Voice input
+    - text: Experimental Transcribe recordings locally with SenseVoice; first use requires installing dependencies
+    - switch "Enable Voice input"
+  - listitem:
+    - button "View Shell": Shell
+    - text: Limit how long each command may run and how much it may output.
+  - listitem:
+    - button "View Agent loop": Agent loop
+    - text: Control how the Agent dispatches tool calls.
+  - listitem:
+    - button "View Subagent": Subagent
+    - text: Set Subagent recursion depth, count, and models.
+  - listitem:
+    - button "View Web search": Web search
+    - text: Set up the DeepSeek search provider.
+- heading "Installed" [level=3]
+- text: "1"
+- list:
+  - listitem:
+    - button "View dsh-web-scaffold-defaults": dsh-web-scaffold-defaults
+    - text: 1.0.0
+    - switch "Enable dsh-web-scaffold-defaults" [checked]
+
+- button "Back to plugins": Plugins
+- switch "Enable Agent Teams"
+- heading "Agent Teams" [level=3]
+- text: v0.2.0-rc.2 Experimental
+- paragraph:
+  - code: "@deepseek-ai/dsh-experimental-agent-team-profile"
+- paragraph: Enable team collaboration, team tools, the member roster, and the shared task board.
+- heading "Components" [level=4]
+- text: 3 total · 3 off
+- list:
+  - listitem:
+    - text: Team Collaboration Manage team members, member messages, and shared tasks.
+    - code: agent-team
+    - code: "@deepseek-ai/dsh-experimental-agent-team"
+    - text: "Off"
+  - listitem:
+    - text: Team Tools Give agents tools to coordinate members, exchange messages, and manage shared tasks.
+    - code: tool-agent-team
+    - code: "@deepseek-ai/dsh-experimental-tool-agent-team"
+    - text: "Off"
+  - listitem:
+    - text: Team Panel View team members and shared tasks, and navigate to member conversations.
+    - code: ui-agent-team
+    - code: "@deepseek-ai/dsh-experimental-client-ui-agent-team"
+    - text: "Off"

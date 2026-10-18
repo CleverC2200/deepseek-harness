@@ -24,7 +24,7 @@ import {
 } from './scaffold.ts'
 import {
   connectFreshWorkspace, connectFreshWorkspaceZh, expandOwningTurnProcess, newEnglishPage, saveFailureShot,
-  writeComposerDraft, ZH_BROWSER_LOCALE,
+  writeComposerDraft, ZH_BROWSER_LOCALE, openSettings,
 } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/lifecycle-chrome', import.meta.url))
@@ -449,6 +449,23 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 
+  it.skipIf(MODE === 'record')('preserves the recorded conversation across plugin settings', async () => {
+    const before = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+    await openSettings(page, 'en', 'Plugin management')
+    const panel = page.locator('[data-plugin-panel]')
+    await panel.getByRole('heading', { name: 'Plugins', exact: true }).waitFor()
+    const list = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
+    await panel.getByRole('button', { name: 'View Agent Teams', exact: true }).click()
+    const detail = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
+    await page.keyboard.press('Escape')
+    await page.getByRole('dialog', { name: 'Settings', exact: true }).waitFor({ state: 'hidden' })
+    await openSettings(page, 'en', 'Plugin management')
+    expect(await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)).toBe(detail)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'plugin-settings.expected.md'), [list, detail].join('\n\n'), MODE)
+    await page.keyboard.press('Escape')
+    expect(await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)).toBe(before)
+  })
+
   it.skipIf(MODE === 'record')('cascades the dark theme from the body attribute to painted surfaces', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-lifecycle-dark'))
     // This scenario pins the ThemeRuntime's DOM contract directly (the
@@ -607,7 +624,7 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
       'session.v3.jsonl', 'replay.override.json', 'command-menu.expected.md',
       'command-menu-fuzzy.expected.md', 'command-menu-zh.expected.md', 'connection-error.expected.md',
       'hero.expected.md', 'plan-active.expected.md', 'plan-active-zh.expected.md',
-      'reloaded.expected.md', 'reloaded-expanded.expected.md',
+      'reloaded.expected.md', 'reloaded-expanded.expected.md', 'plugin-settings.expected.md',
     ])
   })
 })
