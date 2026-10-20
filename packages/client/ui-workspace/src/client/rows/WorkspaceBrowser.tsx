@@ -835,6 +835,8 @@ function SearchResults({
  */
 export function WorkspaceBrowser({
   wide,
+  heading,
+  expanded = true,
   usePanelInfo,
   expandSidebar,
   useSessions,
@@ -1205,11 +1207,11 @@ export function WorkspaceBrowser({
   }
 
   return (
-    <div className={clsx(css.root, !wide && css.rail)}>
+    <div className={clsx(css.root, !wide && css.rail, !expanded && css.collapsed)}>
       <div className={css.sectionHeader}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
-            {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}
+            {heading ?? (groupBy === 'flat' ? t('section.sessions') : t('section.workspaces'))}
           </span>
         )}
         {wide && (
@@ -1340,7 +1342,7 @@ export function WorkspaceBrowser({
 
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
-      <div className={css.listArea}>
+      <div className={css.listArea} hidden={!expanded} data-workspace-session-list="">
         {wide && (normalizedQuery !== ''
           ? (
             <SearchResults

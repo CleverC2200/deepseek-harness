@@ -150,6 +150,20 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
   b.view.rerender(<WorkspaceBrowser {...b.props} />)
 }
 
+it('uses the shell heading and folds the list without replacing its Session rows', () => {
+  const heading = <button type="button">Company workspace</button>
+  const b = mount({ heading, expanded: false, useSessions: hook(sessionState([summary('retained-session', 1)])) })
+  act(() => b.store.actions.setGroupBy('flat'))
+  expect(b.view.getByRole('button', { name: 'Company workspace' })).toBeTruthy()
+  expect(b.view.queryByText('工作区', { exact: true })).toBeNull()
+  const list = b.view.container.querySelector('[data-workspace-session-list]')!
+  expect(list.hasAttribute('hidden')).toBe(true)
+  const row = b.view.getByText('retained-session')
+  rerender(b, { expanded: true })
+  expect(list.hasAttribute('hidden')).toBe(false)
+  expect(b.view.getByText('retained-session')).toBe(row)
+})
+
 describe('WorkspaceBrowser', () => {
   it.each([{ messages: en, common: commonEn }, { messages: zh, common: commonZh }])('shows localized fork failures and dismisses them', ({ messages, common }) => {
     const b = mount({ t: makeTranslate(messages, common) })

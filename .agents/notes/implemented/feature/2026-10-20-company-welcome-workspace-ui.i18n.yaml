@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for 2026-10-20-company-welcome-workspace-ui.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-20-company-welcome-workspace-ui.md
+/agent-note-company-welcome-and-workspace-ui-extension-points:
+  en: 0bfcebb65e209479
+  zh: 4e685fccbe4b1a89
+/agent-note-company-welcome-and-workspace-ui-extension-points/decision:
+  en: 6ee4cb5c9a98652a
+  zh: 0f36cf074d140905
+/agent-note-company-welcome-and-workspace-ui-extension-points/verification-and-retirement:
+  en: 15f8ca2c1a73fc03
+  zh: 325ea8dcf9236b06

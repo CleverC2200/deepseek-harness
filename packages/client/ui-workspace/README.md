@@ -13,6 +13,8 @@ Desktop product events use the optional [product analytics service](../product-a
 
 This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion; the Session row menu and its hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions remain hidden. An idle, unarchived Session row with active scheduled tasks shows a clock mark, and its hover card lists those tasks. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, adding is unavailable.
 
+The `sidebar.workspaces` owner can supply a `heading` and an `expanded` flag. The browser retains its default heading and expanded state when omitted. Collapsing hides the list and header actions while keeping the browser and its view state mounted.
+
 ## Table of Contents
 
 - [Use this package](#use-this-package)

@@ -14,6 +14,16 @@
   padding-right: 0;
 }
 
+.root.collapsed {
+  flex: none;
+}
+
+.collapsed .searchSlot,
+.collapsed .headerActions,
+.listArea[hidden] {
+  display: none;
+}
+
 .iconButton {
   flex: none;
   display: inline-flex;

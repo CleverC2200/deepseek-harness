@@ -13,6 +13,8 @@ kind: "package-reference"
 
 本包让用户浏览分组或扁平的 Session 列表、为新 Session 选择 Workspace，并通过添加、重命名、重排序、搜索、fork、归档和删除 Workspace 来管理 Workspace 与 Session；Session 行菜单及其悬停按钮是可由客户端插件扩展的 slot 列表。待处理交互显示为警告点，subagent 来源的 Session 则保持隐藏。处于空闲状态且未归档、其 Session 有活动定时任务的 Session 行会显示时钟标记，其悬浮卡片会列出这些任务。规范化后仍有差异的文件夹路径会保留为独立 Workspace。添加 Workspace 需要组合目录选择器；没有目录选择器时，添加操作不可用。
 
+`sidebar.workspaces` 的 owner 可提供 `heading` 和 `expanded`。省略时保留默认标题与展开状态。收起时隐藏列表和标题操作，浏览器及其视图状态仍保持挂载。
+
 ## 目录
 
 - [使用本包](#use-this-package)
