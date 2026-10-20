@@ -1028,6 +1028,9 @@ export function WorkspaceBrowser({
   // Section-header ＋ opens the picker menu (same popover in wide and rail
   // states; the menu anchors on this button).
   const wsPickerOpen = shortcutState.addRequested
+  useEffect(() => {
+    if (wsPickerOpen && !expanded) expandSidebar()
+  }, [wsPickerOpen, expanded])
   const wsPlusRef = useRef<HTMLButtonElement>(null)
   const composingRef = useRef(false)
 
@@ -1052,28 +1055,28 @@ export function WorkspaceBrowser({
   // expand request; once the shell flips wide the input mounts and takes focus.
   const [searchOnExpand, setSearchOnExpand] = useState(false)
   useEffect(() => {
-    if (wide && searchOnExpand) {
+    if (wide && expanded && searchOnExpand) {
       const timer = window.setTimeout(() => {
         searchInput.current?.focus({ preventScroll: true })
         setSearchOnExpand(false)
       }, EXPAND_SLIDE_MS)
       return () => { window.clearTimeout(timer) }
     }
-  }, [wide, searchOnExpand])
+  }, [wide, expanded, searchOnExpand])
   useEffect(() => {
     if (shortcutState.searchRequest === 0) return
     closeAddWorkspace()
     setSearchExpanded(true)
-    if (!wide) {
+    if (!wide || !expanded) {
       setSearchOnExpand(true)
       expandSidebar()
     } else searchInput.current?.focus({ preventScroll: true })
   }, [shortcutState.searchRequest])
 
   useEffect(() => {
-    if (!wide || !searchExpanded || searchOnExpand) return
+    if (!wide || !expanded || !searchExpanded || searchOnExpand) return
     searchInput.current?.focus({ preventScroll: true })
-  }, [wide, searchExpanded, searchOnExpand])
+  }, [wide, expanded, searchExpanded, searchOnExpand])
 
   // Outside-click dismissal stays off while the rail gesture is in flight
   // (searchOnExpand): the rail click flips the shell wide and mounts this
@@ -1081,7 +1084,7 @@ export function WorkspaceBrowser({
   // the now-unmounted rail button as its target — outside searchRoot, so the
   // listener would dismiss the search that click just opened.
   useEffect(() => {
-    if (!wide || !searchExpanded || searchOnExpand) return
+    if (!wide || !expanded || !searchExpanded || searchOnExpand) return
     const onClick = (event: MouseEvent): void => {
       if (!(event.target instanceof Node) || searchRoot.current?.contains(event.target) === true) return
       searchInput.current?.blur()

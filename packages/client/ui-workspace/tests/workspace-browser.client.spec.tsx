@@ -153,7 +153,7 @@ function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrows
 it('uses the shell heading and folds the list without replacing its Session rows', () => {
   const heading = <button type="button">Company workspace</button>
   const b = mount({ heading, expanded: false, useSessions: hook(sessionState([summary('retained-session', 1)])) })
-  act(() => b.store.actions.setGroupBy('flat'))
+  act(() => { b.store.actions.setGroupBy('flat') })
   expect(b.view.getByRole('button', { name: 'Company workspace' })).toBeTruthy()
   expect(b.view.queryByText('工作区', { exact: true })).toBeNull()
   const list = b.view.container.querySelector('[data-workspace-session-list]')!
@@ -162,6 +162,15 @@ it('uses the shell heading and folds the list without replacing its Session rows
   rerender(b, { expanded: true })
   expect(list.hasAttribute('hidden')).toBe(false)
   expect(b.view.getByText('retained-session')).toBe(row)
+})
+
+it('asks the shell to expand for search and add requests while folded', () => {
+  const expandSidebar = vi.fn()
+  const b = mount({ expanded: false, expandSidebar })
+  act(() => { b.controls.search() })
+  expect(expandSidebar).toHaveBeenCalledTimes(1)
+  act(() => { b.controls.add() })
+  expect(expandSidebar).toHaveBeenCalledTimes(2)
 })
 
 describe('WorkspaceBrowser', () => {
