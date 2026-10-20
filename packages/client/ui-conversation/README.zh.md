@@ -13,8 +13,6 @@ kind: "package-reference"
 
 `ui-conversation` 拥有与 target 无关的 Conversation 组装和共享浏览器 shell。它消费 Session Controller 的 `SessionEventLikeEntry` feed，通过 `ctx.uiConversation` 暴露不依赖 React 的注册表与逐 Session binding，并通过 `ctx.uiSession` 提供 `useConversation`、`useInput` 和 `inputActions` 标准 props。它还拥有按会话的持久化图片 URL 缓存：`ctx.uiConversation.imageUrl(sessionId, attachment)` 为每个附件解析一个经会话授权的浏览器 URL，并随 Session binding 释放而撤销，因此所有 Conversation target 共享一次 `session.attachment` 读取。Chat 等具体 target 位于独立包，由各自包注册 Definition、快照 builder、View 和 renderer。
 
-`conversation.hero.content` 插槽替换空会话的欢迎标题与说明。没有贡献时保留原品牌图标、标题和预览标识。工作区选择、Agent 选择和输入区仍位于该插槽之外。
-
 ## 目录
 
 - [Conversation 组装](#conversation-assembly)
@@ -45,6 +43,8 @@ target package 通过 declaration merge 扩展 snapshot 与 Location data map，
 
 <a id="shell-and-standard-props"></a>
 ## Shell 与标准 props
+
+`conversation.hero.content` 插槽替换空会话的欢迎标题与说明。没有贡献时保留原品牌图标、标题和预览标识。工作区选择、Agent 选择和输入区仍位于该插槽之外。
 
 共享图片插槽属性将展示选择与持久化引用分开：`thumbnail` 请求完整缩放的附件列表缩略图，`compact` 请求裁剪的图片方块。每张图片可通过可选的 `label` 提供无障碍展示名称；加载和缓存标识仍使用原始附件引用。[ui-attachment](../ui-attachment/README.zh.md) 负责渲染与灯箱。
 

@@ -5,9 +5,18 @@
 /agent-note-company-welcome-and-workspace-ui-extension-points:
   en: 0bfcebb65e209479
   zh: 4e685fccbe4b1a89
+/agent-note-company-welcome-and-workspace-ui-extension-points/problem:
+  en: cc67f6a431c9b095
+  zh: a7a0e8ec5f73f2fe
 /agent-note-company-welcome-and-workspace-ui-extension-points/decision:
-  en: 6ee4cb5c9a98652a
-  zh: 0f36cf074d140905
-/agent-note-company-welcome-and-workspace-ui-extension-points/verification-and-retirement:
-  en: 15f8ca2c1a73fc03
-  zh: 325ea8dcf9236b06
+  en: 197b9ec3005b70dd
+  zh: 75011f023872d1e1
+/agent-note-company-welcome-and-workspace-ui-extension-points/alternatives-considered:
+  en: b3d13f7d3bd0dba8
+  zh: 28a14399336b9891
+/agent-note-company-welcome-and-workspace-ui-extension-points/consequences:
+  en: e32e6394fc08f180
+  zh: 165cbf3cc36b5b60
+/agent-note-company-welcome-and-workspace-ui-extension-points/verification:
+  en: c1cfcf80faf76d51
+  zh: 7e1f844fd990d7b0

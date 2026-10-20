@@ -13,8 +13,6 @@ Desktop product events use the optional [product analytics service](../product-a
 
 This package lets users browse grouped or flat Session lists, choose a Workspace for a new Session, and manage Workspaces and Sessions through add, rename, reorder, search, fork, archive, and Workspace deletion; the Session row menu and its hover buttons are slot lists that client plugins extend. Pending interactions appear as warning dots, and subagent-origin Sessions remain hidden. An idle, unarchived Session row with active scheduled tasks shows a clock mark, and its hover card lists those tasks. Canonically distinct folder paths remain separate Workspaces. Adding a Workspace requires a composed directory picker; without one, adding is unavailable.
 
-The `sidebar.workspaces` owner can supply a `heading` and an `expanded` flag. The browser retains its default heading and expanded state when omitted. Collapsing hides the list and header actions while keeping the browser and its view state mounted.
-
 ## Table of Contents
 
 - [Use this package](#use-this-package)
@@ -92,6 +90,8 @@ The package is one composition: both target slots are declared by other plugins,
 The browser entry also declares two root-scoped `list` child seats on each Session row: `sidebar.session.row.leading`, rendered only while that row's primary status is idle and left blank on an archived row, and `sidebar.session.row.hover`, mounted only while that row's hover card is open. Both take the row's Session identity and nothing else, so an occupant reads its own data by that id; a Session-scoped seat would force a Session binding, which would activate and retain every listed Session.
 
 ### The directory-flow hole
+
+The `sidebar.workspaces` owner can supply a `heading` and an `expanded` flag. The browser retains its default heading and expanded state when omitted. Collapsing hides the list and header actions while keeping the browser and its view state mounted.
 
 Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the `-native` backend's renderless OS-chooser driver, an in-app browsing dialog under a `-browse` composition. The flat **Add workspace...** action renders only while the surface's hole is occupied; an empty hole means the composition has no picking affordance. This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed.
 

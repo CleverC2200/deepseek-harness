@@ -13,8 +13,6 @@ Desktop product events use the optional [product analytics service](../product-a
 
 `ui-conversation` owns target-neutral Conversation assembly and the shared browser shell. It consumes Session Controller `SessionEventLikeEntry` feeds, exposes React-free registries and per-Session bindings through `ctx.uiConversation`, and contributes the `useConversation`, `useInput`, and `inputActions` standard props through `ctx.uiSession`. It also owns the per-session durable image URL cache: `ctx.uiConversation.imageUrl(sessionId, attachment)` resolves one session-authorized browser URL per attachment and revokes it with the Session binding, so every Conversation target shares one `session.attachment` read. Concrete targets such as Chat are separate packages that register their own Definitions, snapshot builders, Views, and renderers.
 
-The `conversation.hero.content` slot replaces the blank welcome heading and supporting copy. Without a contribution, the original brand mark, headline and preview badge remain. The workspace picker, Agent selector and composer remain outside this slot.
-
 ## Table of Contents
 
 - [Conversation assembly](#conversation-assembly)
@@ -45,6 +43,8 @@ Target packages declaration-merge their snapshot and Location data maps, then re
 
 <a id="shell-and-standard-props"></a>
 ## Shell and standard props
+
+The `conversation.hero.content` slot replaces the blank welcome heading and supporting copy. Without a contribution, the original brand mark, headline and preview badge remain. The workspace picker, Agent selector and composer remain outside this slot.
 
 The shared image slot props keep display choices separate from durable references: `thumbnail` requests a contained attachment-list thumbnail, while `compact` requests a cropped gallery tile. An optional per-image `label` supplies the accessible display name; loading and cache identity still use the original attachment reference. [ui-attachment](../ui-attachment/README.md) owns rendering and the lightbox.
 
