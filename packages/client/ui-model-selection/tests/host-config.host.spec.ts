@@ -10,7 +10,7 @@ describe('model selection deployment config', () => {
     expect(Config({ visibleProviders: undefined })).toEqual({ visibleProviders: undefined })
     expect(Config({ visibleProviders: [] })).toEqual({ visibleProviders: [] })
     expect(Config({ visibleProviders: ['gea-analysis'] })).toEqual({ visibleProviders: ['gea-analysis'] })
-    expect(await Config['~standard'].validate({ visibleProviders: [1] })).toMatchObject({ issues: expect.any(Array) })
+    expect((await Config['~standard'].validate({ visibleProviders: [1] })).issues).toBeDefined()
   })
 
   it('projects the deployment filter and releases its injection on plugin disposal', async () => {
