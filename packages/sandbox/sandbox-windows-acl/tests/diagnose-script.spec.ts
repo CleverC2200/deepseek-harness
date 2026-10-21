@@ -248,7 +248,9 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
       icacls(target, '/setintegritylevel', 'L')
       const labelsBefore = integrityLines(target)
       expect(labelsBefore.length).toBeGreaterThan(0)
+      console.log('[DEBUG-acl-ci] before paired permissions', aclLines(target))
       icacls(target, '/inheritance:r', '/grant:r', `*${meSid}:(M)`)
+      console.log('[DEBUG-acl-ci] after paired permissions', aclLines(target))
       const ownerBefore = ownerOf(target)
 
       const run = runScript(['-Path', target, '-AllowRoot', scratch, '-Out', join(scratch, 'out')])
