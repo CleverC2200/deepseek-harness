@@ -542,7 +542,7 @@ export interface Config {
 /** Deployment options shared by the Host injection and browser model directory. */
 export interface ModelSelectionConfig {
   /** Visible provider ids; absent shows all providers, while an empty list shows no choices. */
-  visibleProviders?: readonly string[]
+  visibleProviders?: readonly string[] | undefined
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-model-selection -->
