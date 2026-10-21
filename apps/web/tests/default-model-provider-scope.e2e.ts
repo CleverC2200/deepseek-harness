@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { launchWebScaffold, watchConsole, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+import { launchWebScaffold, watchConsole, acknowledgeReloadConnectionLoss, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
 import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh } from './support.ts'
 
 const OVERLAY = fileURLToPath(new URL('./default-model-provider-scope.overlay.yml', import.meta.url))
@@ -67,16 +67,20 @@ describe('web e2e: deployment provider visibility', () => {
       if (pass === 0) {
         await page.keyboard.press('Escape')
         await page.locator('[data-composer-input]').first().fill('')
+        const warningStart = tripwire.warnings.length
         await page.reload({ waitUntil: 'load' })
         await trigger.waitFor()
+        acknowledgeReloadConnectionLoss(tripwire, warningStart)
       } else {
         await popup.getByRole('option', { name: 'Acme Large', exact: true }).click()
       }
     }
     await expect.poll(() => scaffold.ctx.agentDefaultModel.currentSelection())
       .toMatchObject({ provider: 'acme-gateway', model: 'acme-large' })
+    const warningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
     await expect.poll(() => trigger.textContent()).toContain('Acme Large')
+    acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await compareOrRefreshGolden(
       fileURLToPath(new URL('./expected/default-model/provider-scope.expected.md', import.meta.url)),
       visibleMenus.join('\n'), webSnapshotMode(),
