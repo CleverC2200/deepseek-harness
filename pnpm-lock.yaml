@@ -4096,7 +4096,7 @@ importers:
         specifier: workspace:*
         version: link:../../util/values
       '@deepseek-ai/schemastery':
-        specifier: workspace:~
+        specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
       '@types/react':
         specifier: ~18.3.1
