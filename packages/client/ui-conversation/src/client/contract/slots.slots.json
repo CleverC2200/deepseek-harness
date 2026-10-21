@@ -1,0 +1,6 @@
+{
+  "conversation.hero.content": {
+    "en": "Register the blank-session welcome content, including its heading and any supporting copy. The empty owner share carries no Session or input state. With no contribution, the existing brand mark, headline and preview badge remain. Workspace selection, Agent selection and the composer stay mounted outside this seat.",
+    "zh": "注册空会话的欢迎内容，包括标题与说明。空 owner 不携带 Session 或输入状态。没有贡献时保留原品牌图标、标题和预览标识；工作区选择、Agent 选择和输入区仍在该座位外常驻。"
+  }
+}

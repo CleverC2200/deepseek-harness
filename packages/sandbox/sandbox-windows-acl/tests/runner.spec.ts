@@ -539,6 +539,8 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     mkdirSync(child)
     writeFileSync(join(granted, 'file.txt'), 'x')
     writeFileSync(join(child, 'deep.txt'), 'x')
+    const reset = spawnSync('icacls', [child, '/reset'], { encoding: 'utf8' })
+    expect(reset.status, `${reset.stdout}\n${reset.stderr}`).toBe(0)
     const grant = AclWriteGrant.create(workspaceWriteSid(granted))
     grant.add(granted, true)
     try {

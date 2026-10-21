@@ -91,6 +91,8 @@ Workspace 和 Session 的启动基线均就绪后，空安装环境调用 `works
 
 ### 目录流子 slot
 
+`sidebar.workspaces` 的 owner 可提供 `heading` 和 `expanded`。省略时保留默认标题与展开状态。收起时隐藏列表和标题操作，浏览器及其视图状态仍保持挂载。
+
 每个注册各自声明一个**目录流子 slot**（`single` kind：`conversation.hero.workspace.directoryFlow`／`sidebar.workspaces.directoryFlow`），由组合的选择器包 client half 填入其选取交互——`-native` 后端的无渲染 OS 选择器驱动，`-browse` 组合下则是应用内浏览对话框。平铺显示的**添加工作区…** 操作仅在当前界面的 slot 被占用时渲染；slot 为空意味着该组合没有目录选择能力。本包持有触发与接纳：占用方通过 slot 的属主交互约定（`open`/`busy`/`onPicked`/`onCancel`/`onError`）每次打开上报一个所选路径，owner 通过对象层接纳它，并等待 Workspace 列表投影刷新后才选中已提交的 Workspace。
 
 ### Session 行 action

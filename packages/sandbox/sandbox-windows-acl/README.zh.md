@@ -164,6 +164,10 @@ seam 先把确定性工作区 SID 的 ACE 常驻物化（每个工作区每服�
 -----
 
 <a id="model-experience"></a>
+## Windows 验证
+
+Windows 原生与 coverage 检查运行诊断脚本和真实 runner 测试。诊断夹具在自有临时目录上替换 DACL，明确仅保留 Modify 允许条目；继承探针在根目录授权前，将子目录重置为仅保留继承条目。清理仅限自有临时树，不修复宿主 ACL。
+
 ## 模型体验
 
 间接地通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)、[`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.zh.md) 及其工具呈现；它们渲染此后端的部分强制执行与拒绝事实（工具层通过 `denialSignatures` 分类的受限 stderr），而 [`dsh-sandbox`](../sandbox/README.zh.md) seam 拥有 `SANDBOX_UNAVAILABLE` 文本、`sandbox-local` 拥有 runner 选择。在 Windows 上本包还贡献一个目录条目——随包发布的 `diagnose-windows-sandbox-acl` 技能，模型正是从它学会诊断工具层只能上报的拒绝。
