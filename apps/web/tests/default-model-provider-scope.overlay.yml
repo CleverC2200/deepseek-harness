@@ -1,0 +1,7 @@
+- id: agent-default-model
+  config:
+    provider: origin-gateway
+    model: origin-large
+- id: ui-model-selection
+  config:
+    visibleProviders: [acme-gateway]

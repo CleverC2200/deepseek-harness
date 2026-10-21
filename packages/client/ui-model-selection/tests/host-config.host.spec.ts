@@ -5,11 +5,12 @@ import { apply, Config } from '../src/index.ts'
 import { MODEL_SELECTION_CONFIG_GLOBAL } from '../src/config.ts'
 
 describe('model selection deployment config', () => {
-  it('validates provider ids and keeps an absent filter distinct from an empty one', () => {
+  it('validates provider ids and keeps an absent filter distinct from an empty one', async () => {
     expect(Config({})).toEqual({})
+    expect(Config({ visibleProviders: undefined })).toEqual({ visibleProviders: undefined })
     expect(Config({ visibleProviders: [] })).toEqual({ visibleProviders: [] })
     expect(Config({ visibleProviders: ['gea-analysis'] })).toEqual({ visibleProviders: ['gea-analysis'] })
-    expect(() => Config({ visibleProviders: [1] })).toThrow()
+    expect(await Config['~standard'].validate({ visibleProviders: [1] })).toMatchObject({ issues: expect.any(Array) })
   })
 
   it('projects the deployment filter and releases its injection on plugin disposal', async () => {
