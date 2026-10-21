@@ -91,7 +91,7 @@ The browser entry also declares two root-scoped `list` child seats on each Sessi
 
 ### The directory-flow hole
 
-The `sidebar.workspaces` owner can supply a `heading` and an `expanded` flag. The browser retains its default heading and expanded state when omitted. Collapsing hides the list and header actions while keeping the browser and its view state mounted.
+The `sidebar.workspaces` owner can supply a `heading` and an `expanded` flag. Element headings fill the available header width and height, including when collapsed. The browser retains its default heading and expanded state when omitted. Collapsing hides the list and header actions while keeping the browser and its view state mounted.
 
 Each registration declares a **directory-flow child hole** (`single` kind: `conversation.hero.workspace.directoryFlow` / `sidebar.workspaces.directoryFlow`) that the composed picker package's client half fills with its picking interaction — the `-native` backend's renderless OS-chooser driver, an in-app browsing dialog under a `-browse` composition. The flat **Add workspace...** action renders only while the surface's hole is occupied; an empty hole means the composition has no picking affordance. This package owns the trigger and the adoption: the occupant reports one picked path per open through the hole's owner conversation (`open`/`busy`/`onPicked`/`onCancel`/`onError`), and the owner adopts it through the object layer, selecting the committed Workspace only after its list projection has refreshed.
 
