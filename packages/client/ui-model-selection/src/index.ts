@@ -5,7 +5,7 @@ import z from '@deepseek-ai/schemastery'
 import { MODEL_SELECTION_CONFIG_GLOBAL, type ModelSelectionConfig } from './config.ts'
 
 /** Validated deployment options; the default retains every provider. */
-export const Config: z<ModelSelectionConfig> = z.object({
+export const Config = z.object({
   visibleProviders: z.union([z.const(undefined), z.array(z.string())]),
 })
 
