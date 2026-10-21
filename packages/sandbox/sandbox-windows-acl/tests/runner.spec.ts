@@ -539,11 +539,16 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     mkdirSync(child)
     writeFileSync(join(granted, 'file.txt'), 'x')
     writeFileSync(join(child, 'deep.txt'), 'x')
+    const reset = spawnSync('icacls', [child, '/reset'], { encoding: 'utf8' })
+    expect(reset.status, `${reset.stdout}\n${reset.stderr}`).toBe(0)
+    console.log('[DEBUG-acl-ci] child before grant', spawnSync('icacls', [child], { encoding: 'utf8' }).stdout)
     const grant = AclWriteGrant.create(workspaceWriteSid(granted))
     grant.add(granted, true)
+    console.log('[DEBUG-acl-ci] child after grant', spawnSync('icacls', [child], { encoding: 'utf8' }).stdout)
     try {
       const probe = `
 $ErrorActionPreference='SilentlyContinue'
+whoami /priv
 Add-Type -Namespace P -Name F -MemberDefinition @'
 [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode, EntryPoint="CreateFileW")]
 public static extern IntPtr CreateFileW(string n, uint a, uint s, IntPtr sa, uint d, uint f, IntPtr t);
