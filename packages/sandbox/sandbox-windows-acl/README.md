@@ -162,6 +162,10 @@ Start with the subsystem reference for the shared vocabulary, then the provider 
 -----
 
 <a id="model-experience"></a>
+## Windows verification
+
+The Windows native and coverage lanes run the diagnosis script and real runner tests. Diagnosis fixtures replace the DACL on their own temporary directories to establish a Modify-only allow entry; the inheritance probe resets its child directory to inherited entries before granting the root. Cleanup remains inside the owned temporary tree and never repairs host ACLs.
+
 ## Model Experience
 
 Indirectly, through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md), [`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.md), and their tools, which render this backend's partial-enforcement and denial facts (the confined stderr the tool layer classifies through `denialSignatures`) while the [`dsh-sandbox`](../sandbox/README.md) seam owns the `SANDBOX_UNAVAILABLE` text and `sandbox-local` owns runner selection. On Windows this package also contributes one catalog entry, the bundled `diagnose-windows-sandbox-acl` skill, which is where the model learns to diagnose a denial the tool layer can only report.

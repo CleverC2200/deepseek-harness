@@ -146,6 +146,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('diagnose-windows-sandbox-acl scri
 
   function modifyOnly(path: string, sid = meSid): void {
     pwsh(
+      '$ErrorActionPreference = "Stop"; ' +
       `$acl = Get-Acl -LiteralPath ${quote(path)}; ` +
       '$acl.SetAccessRuleProtection($true, $false); ' +
       'foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRuleSpecific($rule) }; ' +
