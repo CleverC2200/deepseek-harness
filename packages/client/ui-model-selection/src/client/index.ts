@@ -119,7 +119,7 @@ export function apply(ctx: ClientContext): void {
   // through the bound translate; the seat component reads the standard seat.
   const t = ctx.locale.bind(NS)
 
-  ctx.plugin(ModelDirectoryResolver)
+  ctx.plugin(ModelDirectoryResolver, globalThis.__DSH_MODEL_SELECTION_CONFIG__ ?? {})
 
   // Entry 1: the /model popupSelect over the shared directory.
   ctx.inject(['commandUi', 'modelDirectories'], (scope: ClientContext) => {

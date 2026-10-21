@@ -9,7 +9,7 @@
  * Scope disposal drops the directory (HMR safety).
  */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { createScope } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
@@ -204,6 +204,27 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
 const projection = (id: string) => ({ sessionId: sid(id) })
 
 describe('ui-model-selection dual entry', () => {
+  it('uses the deployment provider scope for both entries and retains a hidden saved selection', async () => {
+    vi.stubGlobal('__DSH_MODEL_SELECTION_CONFIG__', { visibleProviders: ['external'] })
+    onTestFinished(() => vi.unstubAllGlobals())
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    b.mint('scoped')
+    const input = projection('scoped')
+    const options = await b.popup().options(input, new AbortController().signal)
+    expect(options.map(option => option.label)).toEqual(['External Flash'])
+    const seat = b.seat().inject!(sid('scoped'))
+    expect(seat.directory.getSnapshot()).toMatchObject({
+      groups: [GROUPS[1]],
+      current: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+      routable: false,
+    })
+    expect(b.calls.select).toBe(0)
+    await b.popup().onSelect(options[0]!, input)
+    expect(seat.directory.getSnapshot().current?.provider).toBe('external')
+    expect((await b.popup().options(input, new AbortController().signal))[0]?.active).toBe(true)
+  })
+
   it('carries writer contention to the model seat and localizes the command failure', async () => {
     const b = await bench()
     b.mint('owned')
