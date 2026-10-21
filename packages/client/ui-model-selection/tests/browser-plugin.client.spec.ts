@@ -206,7 +206,7 @@ const projection = (id: string) => ({ sessionId: sid(id) })
 describe('ui-model-selection dual entry', () => {
   it('uses the deployment provider scope for both entries and retains a hidden saved selection', async () => {
     vi.stubGlobal('__DSH_MODEL_SELECTION_CONFIG__', { visibleProviders: ['external'] })
-    onTestFinished(() => vi.unstubAllGlobals())
+    onTestFinished(() => { vi.unstubAllGlobals() })
     const b = await bench()
     onTestFinished(() => b.ctx.fiber.dispose())
     b.mint('scoped')
