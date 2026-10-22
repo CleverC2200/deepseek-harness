@@ -396,6 +396,8 @@ pnpm run prepare:desktop
 
 每条打包命令都会构建仓库，打包以 dsh 和私有 Desktop Host 为根的第一方生产依赖闭包，并准备目标专用的 Electron 分发包与 pnpm CLI。`prepare:dsh` 在构建时安装一次生产依赖图，准备物化包供 electron-builder 归档到 `app.asar/dsh`，移除包管理器元数据，并生成包含共享包版本和最终文件哈希的 `desktop-runtime.json`。在 macOS 上，它先签名并验证原生文件，再生成清单；electron-builder 不对已签名的此目录重复进行嵌套签名。资源映射明确包含默认根目录过滤器会忽略的 `dsh/node_modules`；准备完成的运行时清单在原生签名后检查。原生可执行文件及库解包到 ASAR 旁；Python、独立 Node 和 pnpm 保留在外部 runtime 资源中。Windows 打包逐项检查准备好的 PE，确认其 ASAR 条目已标记为解包，且磁盘副本字节一致；未签名构建也执行此检查。Builder glob 规则用单字符通配符匹配 PE 文件名中的花括号，因此同目录中名称匹配的文件也可能被解包。准备好的运行时 smoke 沿用已验证的目标描述符，不使用构建宿主的架构。签名安装包、公证、已安装应用升级和各目标原生模块的验收需要发布环境。
 
+`prepare:dsh` 在清洗继承的包管理器配置及重置输出前，通过内置 `pnpm store path` 解析调用者实际使用的下载内容 store。`DSH_DESKTOP_PNPM_STORE_DIR` 可选择显式绝对 store 路径；`DSH_DESKTOP_PNPM_COLD_DOWNLOAD=1` 使用临时私有 store，不能与该路径覆盖同时设置。两者可在平台 dotenv 文件或准备环境中配置。共享 store 必须位于准备输出及状态目录之外，清理后继续保留。每轮仍使用独立生产安装图、空 npm 用户配置并关闭 global virtual store；物化与运行时完整性检查仍需执行。选定 store 不代表缓存命中。[公司下载 store 决策](../../.agents/notes/implemented/process/2026-10-22-desktop-download-store.zh.md)记录维护范围。
+
 macOS 打包在组装 App 时、代码签名前写入 `Contents/Resources/app-update.yml`，供并行 ZIP 与 DMG 路线使用的目录构建也执行此操作。签名钩子验证准确的更新源和 updater 缓存目录。写入发布完成记录前，流程会再次检查两条路线的副本和最终移入的 App；配置缺失或不匹配会阻止移入产物，因而也会阻止上传。
 
 未压缩产物包含 Electron、物化后的 dsh 生产依赖树、pnpm，以及壳应用。安装包大小与文件系统占用不同；发布验收需要测量两者，以及 profile 插件存储和首次启动耗时。此布局用更多应用内文件换取消除用户机器上的核心包安装过程。

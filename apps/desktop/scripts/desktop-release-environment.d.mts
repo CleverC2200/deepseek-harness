@@ -50,6 +50,16 @@ export type MacOSNotarizationEnvironment =
 export function resolveDesktopAppId(env: NodeJS.ProcessEnv): string
 
 /**
+ * Validate download-store controls without reading caller configuration or starting pnpm.
+ * @param env - Packaging environment.
+ * @returns Selected download mode.
+ */
+export function resolveDesktopPnpmStoreConfiguration(env: NodeJS.ProcessEnv):
+  | { kind: 'default' }
+  | { kind: 'cold' }
+  | { kind: 'explicit'; path: string }
+
+/**
  * Resolve the npm registry used to materialize the bundled runtime and its external dependencies.
  * @param env - Packaging environment.
  * @returns Registry origin; the public registry unless a local mirror is configured.

@@ -1,5 +1,7 @@
 /** Resolve public release identifiers supplied by the packaging environment. */
 
+import { isAbsolute } from 'node:path'
+
 /** Environment variable that supplies the Electron application identifier. */
 export const DESKTOP_APP_ID_ENV = 'DSH_DESKTOP_APP_ID'
 
@@ -35,6 +37,28 @@ function requireEnvironmentValue(env, name) {
     throw new Error(`desktop release environment: ${name} must be set to a non-empty value`)
   }
   return value
+}
+
+/**
+ * Validate download-store controls without reading caller configuration or starting pnpm.
+ * @param {NodeJS.ProcessEnv} env - Packaging environment.
+ * @returns {{ kind: 'default' } | { kind: 'cold' } | { kind: 'explicit', path: string }} Selected download mode.
+ */
+export function resolveDesktopPnpmStoreConfiguration(env) {
+  const coldDownload = env.DSH_DESKTOP_PNPM_COLD_DOWNLOAD
+  if (coldDownload !== undefined && coldDownload !== '0' && coldDownload !== '1') {
+    throw new Error('desktop runtime: DSH_DESKTOP_PNPM_COLD_DOWNLOAD must be 0 or 1')
+  }
+  const path = env.DSH_DESKTOP_PNPM_STORE_DIR
+  if (coldDownload === '1') {
+    if (path !== undefined) throw new Error('desktop runtime: cold downloads cannot use an explicit pnpm store')
+    return { kind: 'cold' }
+  }
+  if (path === undefined) return { kind: 'default' }
+  if (!isAbsolute(path) || /[\r\n\0]/u.test(path)) {
+    throw new Error('desktop runtime: pnpm store must be one absolute path')
+  }
+  return { kind: 'explicit', path }
 }
 
 /**

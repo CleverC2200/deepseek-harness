@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-22-desktop-download-store.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-22-desktop-download-store.md
+/agent-note-desktop-download-content-store-reuse:
+  en: e9d276886a31a30e
+  zh: 516b8ffbb41776c5
+/agent-note-desktop-download-content-store-reuse/problem:
+  en: ef44999c4931d2d9
+  zh: 4903939ef9fbe4b6
+/agent-note-desktop-download-content-store-reuse/decision:
+  en: 20b1a2f8a9f06cb9
+  zh: d86074c11456c48e
+/agent-note-desktop-download-content-store-reuse/alternatives-considered:
+  en: 1392a1d1e483316e
+  zh: 62087db47984c20a
+/agent-note-desktop-download-content-store-reuse/consequences:
+  en: a0037b21664de732
+  zh: 16af00fed5ba61e5
+/agent-note-desktop-download-content-store-reuse/verification:
+  en: c0ca44b7433e057d
+  zh: 43ee44c152cad013
