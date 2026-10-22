@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-21-company-model-provider-scope.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-21-company-model-provider-scope.md
+/agent-note-company-model-provider-scope:
+  en: 0731dbc03208f8e3
+  zh: 0d628e46b439606f
+/agent-note-company-model-provider-scope/problem:
+  en: 2cbd3698e8a0b337
+  zh: 7d780682c7221c76
+/agent-note-company-model-provider-scope/decision:
+  en: eaf94f1ec9c7b910
+  zh: 98051afd11cc8dd4
+/agent-note-company-model-provider-scope/alternatives-considered:
+  en: 18d7aa09c234e6cd
+  zh: d65f9137e2b46b16
+/agent-note-company-model-provider-scope/consequences:
+  en: f325541ef7d08f78
+  zh: 476d48925ded173a
+/agent-note-company-model-provider-scope/verification:
+  en: 28a64ceb8be71440
+  zh: 844f40b462013ce3

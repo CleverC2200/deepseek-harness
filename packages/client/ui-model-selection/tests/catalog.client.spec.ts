@@ -1,5 +1,5 @@
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-remotes/client'
-import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
+import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { describe, expect, it, vi } from 'vitest'
 import { ModelCatalogDirectory } from '../src/client/catalog.ts'
 
@@ -10,12 +10,57 @@ const catalog = (model: string): ModelCatalog => ({
   failures: [],
 })
 
-function directory(models: () => Promise<unknown>): ModelCatalogDirectory {
+function directory(models: () => Promise<unknown>, visibleProviders?: readonly string[]): ModelCatalogDirectory {
   // The providing plugin's context, scripted down to the one method it calls.
-  return new ModelCatalogDirectory({ remote: { session: { modelCatalog: models } } } as never)
+  return new ModelCatalogDirectory({ remote: { session: { modelCatalog: models } } } as never, { visibleProviders })
 }
 
 describe('ModelCatalogDirectory', () => {
+  it('filters both entries by provider id while preserving the Host catalog and saved default', async () => {
+    const value: ModelCatalog = {
+      default: { provider: 'direct', model: 'saved', reasoningEffort: 'high' },
+      routableProviders: ['direct', 'gea-analysis'],
+      groups: [
+        { id: 'direct', name: 'GEA personal model', models: [{ id: 'gea-model', name: 'GEA model' }] },
+        { id: 'gea-analysis', name: 'Renamed provider', models: [{ id: 'opaque-id', name: 'Renamed model' }] },
+      ],
+      failures: [
+        { id: 'direct', name: 'Direct', message: 'unavailable' },
+        { id: 'gea-analysis', name: 'GEA', message: 'catalog failed' },
+      ],
+    }
+    const original = structuredClone(value)
+    const subject = directory(async () => ({ ok: true, value }), ['gea-analysis'])
+    const filtered = await subject.load()
+    expect(filtered.groups).toEqual([value.groups[1]])
+    expect(filtered.failures).toEqual([value.failures[1]])
+    expect(filtered.routableProviders).toEqual(['gea-analysis'])
+    expect(filtered.default).toEqual(original.default)
+    expect(value).toEqual(original)
+    expect(subject.store.getSnapshot().value).toBe(filtered)
+    expect(await directory(async () => ({ ok: true, value })).load()).toBe(value)
+  })
+
+  it('keeps an explicit empty provider list empty without changing the saved selection', async () => {
+    const value = catalog('saved')
+    const subject = directory(async () => ({ ok: true, value }), [])
+    expect(await subject.load()).toEqual({
+      ...value, groups: [], routableProviders: [], failures: [],
+    })
+  })
+
+  it('applies the same provider scope after directory changes and Host resets', async () => {
+    let value = catalog('first')
+    const subject = directory(async () => ({ ok: true, value }), ['fixture'])
+    expect((await subject.load()).groups).toHaveLength(1)
+    value = { ...catalog('other'), groups: [{ id: 'other', name: 'Other', models: [{ id: 'other', name: 'Other' }] }], routableProviders: ['other'] }
+    subject.refresh()
+    await vi.waitFor(() => { expect(subject.store.getSnapshot().value?.groups).toEqual([]) })
+    value = catalog('restored')
+    subject.resetGeneration()
+    await vi.waitFor(() => { expect(subject.store.getSnapshot().value?.groups).toEqual(value.groups) })
+  })
+
   it('shares one failing request, exposes the RPC error, and permits a retry', async () => {
     const models = vi.fn()
       .mockResolvedValueOnce({

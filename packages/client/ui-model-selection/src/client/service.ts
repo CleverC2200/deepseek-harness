@@ -20,6 +20,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WeakMapWithValues } from '@deepseek-ai/dsh-util-values'
 import { ModelCatalogDirectory } from './catalog.ts'
 import { ModelDirectory } from './directory.ts'
+import type { ModelSelectionConfig } from '../config.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -42,10 +43,11 @@ export class ModelDirectoryResolver extends Service {
 
   /**
    * @param ctx - owning root context (the service registers itself as `models`).
+   * @param config - static deployment visibility for the shared model menus.
    */
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: ModelSelectionConfig = {}) {
     super(ctx, 'modelDirectories')
-    this.catalog = new ModelCatalogDirectory(ctx)
+    this.catalog = new ModelCatalogDirectory(ctx, config)
     void this.catalog.load().catch(() => { /* selectors expose the shared error */ })
     ctx.on('connection/reset', () => {
       this.catalog.resetGeneration()
