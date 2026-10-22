@@ -3,6 +3,7 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ModelCatalog, ModelSelection, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { ModelSelectionConfig } from '../config.ts'
 
 /** Observable lifecycle of the shared model catalog. */
 export interface ModelCatalogState {
@@ -37,8 +38,9 @@ export class ModelCatalogDirectory {
   /**
    * @param ctx - the providing plugin's context, whose `remote.session`
    * namespace carries the Host-generation catalog.
+   * @param config - deployment visibility shared by both model menus.
    */
-  constructor(private readonly ctx: ClientContext) {}
+  constructor(private readonly ctx: ClientContext, private readonly config: ModelSelectionConfig = {}) {}
 
   /**
    * Return the current generation's catalog, sharing its one in-flight load.
@@ -57,15 +59,22 @@ export class ModelCatalogDirectory {
       if (!response.ok) {
         throw new Error(`${response.error.code}: ${response.error.message}`)
       }
+      const { visibleProviders } = this.config
+      const value = visibleProviders === undefined ? response.value : {
+        ...response.value,
+        groups: response.value.groups.filter(group => visibleProviders.includes(group.id)),
+        failures: response.value.failures.filter(failure => visibleProviders.includes(failure.id)),
+        routableProviders: response.value.routableProviders.filter(id => visibleProviders.includes(id)),
+      }
       if (generation === this.generation) {
         for (const group of response.value.groups) {
           for (const model of group.models) {
             this.reasoning.set(JSON.stringify([group.id, model.id]), model.reasoning)
           }
         }
-        this.store.set({ value: response.value, status: 'ready', error: null })
+        this.store.set({ value, status: 'ready', error: null })
       }
-      return response.value
+      return value
     }).catch((error: unknown) => {
       if (generation === this.generation) {
         this.store.update((draft) => {
