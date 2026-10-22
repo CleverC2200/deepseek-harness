@@ -1,11 +1,10 @@
 /** Materialize the complete production runtime before publishing Desktop resources. */
 
 import { packagingStep } from './packaging-step.mjs'
-import { spawn } from 'node:child_process'
+import { createDesktopRuntimePnpmRunner } from './prepare-dsh-pnpm.ts'
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, join, relative, resolve } from 'node:path'
-import { desktopNodeEnvironment } from '../src/node-environment.ts'
+import { join, relative, resolve } from 'node:path'
 import { createRuntimeProjectMetadata } from '../src/project-manager.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import { parseDesktopRelease, type DesktopRelease } from '../src/release.ts'
@@ -24,7 +23,6 @@ import { writeDesktopRuntime, verifyDesktopRuntime } from '../src/runtime-tree.t
 import {
   resolveDesktopAppId,
   resolveMacOSSigningEnvironment,
-  resolveNpmRegistry,
 } from './desktop-release-environment.mjs'
 import {
   signMacOSRuntime,
@@ -37,7 +35,6 @@ const APP_ROOT = resolve(import.meta.dirname, '..')
 const BUILD_PATHS = resolveDesktopTargetBuildPaths()
 const DSH_OUTPUT_ROOT = BUILD_PATHS.dsh
 const BUILD_ROOT = mkdtempSync(join(tmpdir(), 'dsh-desktop-runtime-'))
-const STORE_ROOT = join(BUILD_ROOT, 'store')
 const RUNTIME_ROOT = BUILD_PATHS.runtime
 const PNPM_BUILD_STATE = BUILD_PATHS.dshPnpm
 const PACKAGE_SET_ROOT = BUILD_PATHS.packageSet
@@ -66,55 +63,17 @@ function desktopRelease(): DesktopRelease {
   })
 }
 
-function runPnpm(args: readonly string[]): Promise<void> {
-  return new Promise((resolvePromise, reject) => {
-    const [command, ...commandArgs] = args
-    if (command === undefined) throw new Error('desktop runtime: pnpm command is required')
-    const registry = resolveNpmRegistry(process.env)
-    const config = join(PNPM_BUILD_STATE, 'config')
-    const userConfig = join(config, 'npmrc')
-    mkdirSync(config, { recursive: true })
-    writeFileSync(userConfig, '')
-    const child = spawn(NODE, [
-      '--expose-internals',
-      PNPM,
-      `--config.registry=${registry}`,
-      `--config.store-dir=${STORE_ROOT}`,
-      '--config.enable-global-virtual-store=false',
-      `--config.userconfig=${userConfig}`,
-      command,
-      ...commandArgs,
-    ], {
-      cwd: BUILD_ROOT,
-      env: {
-        ...Object.fromEntries(Object.entries(process.env).filter(([name]) => (
-          name !== 'NODE_OPTIONS' && name !== 'NODE_PATH' && !/^DSH_DESKTOP_/u.test(name) && !/^(?:npm|pnpm|corepack)_/iu.test(name)
-        ))),
-        NPM_CONFIG_REGISTRY: registry,
-        NPM_CONFIG_STORE_DIR: STORE_ROOT,
-        NPM_CONFIG_USERCONFIG: userConfig,
-        ...desktopNodeEnvironment(NODE, join(RUNTIME_ROOT, 'bin'), {}),
-        PATH: `${join(RUNTIME_ROOT, 'bin')}${delimiter}${process.env.PATH ?? ''}`,
-        XDG_CACHE_HOME: join(PNPM_BUILD_STATE, 'cache'),
-        XDG_CONFIG_HOME: config,
-        XDG_STATE_HOME: join(PNPM_BUILD_STATE, 'state'),
-      },
-      stdio: 'inherit',
-    })
-    child.once('error', reject)
-    child.once('close', (code, signal) => {
-      if (code === 0) resolvePromise()
-      else reject(new Error(`desktop runtime: pnpm exited with ${String(code ?? signal)}`))
-    })
-  })
-}
-
 async function main(): Promise<void> {
+  let outputsReset = false
   try {
+    const runPnpm = createDesktopRuntimePnpmRunner({
+      node: NODE, pnpm: PNPM, runtimeRoot: RUNTIME_ROOT, buildRoot: BUILD_ROOT,
+      buildState: PNPM_BUILD_STATE, outputRoot: DSH_OUTPUT_ROOT,
+    })
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:reset', async () => {
+      outputsReset = true
       rmSync(DSH_OUTPUT_ROOT, { recursive: true, force: true })
       rmSync(PNPM_BUILD_STATE, { recursive: true, force: true })
-      mkdirSync(STORE_ROOT, { recursive: true })
     })
     const release = desktopRelease()
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:stage-packages', async () => {
@@ -166,13 +125,13 @@ async function main(): Promise<void> {
       await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:verify-after-smoke', () => verifyDesktopRuntime(DSH_OUTPUT_ROOT, release.version, target))
     }
   } catch (error) {
-    rmSync(DSH_OUTPUT_ROOT, { recursive: true, force: true })
+    if (outputsReset) rmSync(DSH_OUTPUT_ROOT, { recursive: true, force: true })
     throw error
   } finally {
     let cleaned = false
     const cleanup = (): void => {
       try { rmSync(BUILD_ROOT, { recursive: true, force: true }) }
-      finally { rmSync(PNPM_BUILD_STATE, { recursive: true, force: true }) }
+      finally { if (outputsReset) rmSync(PNPM_BUILD_STATE, { recursive: true, force: true }) }
       cleaned = true
     }
     try { await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:cleanup', async () => cleanup()) }

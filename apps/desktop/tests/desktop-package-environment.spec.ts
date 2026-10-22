@@ -202,3 +202,27 @@ it('owns macOS tuning in the local file and validates it before signing credenti
     expect(() =>{  validateDesktopPackageEnvironment({ ...RELEASE, DSH_DESKTOP_MACOS_NOTARIZATION_PROXY: 'socks5://localhost:8080' }, MACOS) }).toThrow('NOTARIZATION_PROXY')
   })
 })
+
+it('loads the shared pnpm store and cold-download controls for both package targets', async () => {
+  await withDirectory(async (directory) => {
+    const store = join(directory, 'download-store')
+    for (const [platform, file] of [['win32', '.env.windows'], ['darwin', '.env.macos']] as const) {
+      await writeFile(join(directory, file), `DSH_DESKTOP_PNPM_STORE_DIR=${store}\nDSH_DESKTOP_PNPM_COLD_DOWNLOAD=0\n`)
+      const env = loadDesktopPackageEnvironment(platform, {}, directory)
+      expect(env.DSH_DESKTOP_PNPM_STORE_DIR).toBe(store)
+      expect(env.DSH_DESKTOP_PNPM_COLD_DOWNLOAD).toBe('0')
+    }
+  })
+})
+
+it('rejects invalid download-store settings during package preflight', () => {
+  const release = { ...POLICY, DSH_DESKTOP_APP_ID: RELEASE.DSH_DESKTOP_APP_ID }
+  for (const settings of [
+    { DSH_DESKTOP_PNPM_STORE_DIR: 'relative/store' },
+    { DSH_DESKTOP_PNPM_COLD_DOWNLOAD: 'true' },
+    { DSH_DESKTOP_PNPM_COLD_DOWNLOAD: '1', DSH_DESKTOP_PNPM_STORE_DIR: '/store' },
+  ]) {
+    expect(() => { validateDesktopPackageEnvironment({ ...release, ...settings }, WINDOWS, { unsigned: true }) })
+      .toThrow(/desktop runtime:/u)
+  }
+})
