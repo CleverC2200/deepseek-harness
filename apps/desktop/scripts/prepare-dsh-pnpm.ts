@@ -1,7 +1,7 @@
 /** Prepare the Desktop production dependency graph with bundled pnpm. */
 
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { accessSync, constants, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { desktopNodeEnvironment } from '../src/node-environment.ts'
 import { resolveNpmRegistry, resolveDesktopPnpmStoreConfiguration } from './desktop-release-environment.mjs'
@@ -17,7 +17,7 @@ function physicalPath(path: string): string {
 }
 
 /**
- * Resolve the download store before resetting outputs and create an isolated production installer.
+ * Resolve a writable, searchable download store before resetting outputs and create an isolated production installer.
  * @param options - Bundled executables and private preparation paths.
  * @returns Runner that settles after its pnpm command exits; shared stores survive preparation cleanup.
  */
@@ -56,6 +56,7 @@ export function createDesktopRuntimePnpmRunner(options: {
     }
   }
   mkdirSync(store, { recursive: true })
+  accessSync(store, constants.W_OK | constants.X_OK)
   return args => new Promise((resolvePromise, reject) => {
     const [command, ...commandArgs] = args
     if (command === undefined) throw new Error('desktop runtime: pnpm command is required')

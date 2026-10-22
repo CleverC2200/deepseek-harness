@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -122,4 +122,15 @@ it('rejects public-store aliases inside a cleanup root before creating missing s
       environment: { DSH_DESKTOP_PNPM_STORE_DIR: join(alias, 'output', 'missing-store') },
     })).toThrow('outside preparation cleanup directories')
   } finally { unlinkSync(alias) }
+})
+
+it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('rejects an existing unwritable store before preparing installation', () => {
+  const { sharedStore, options } = fixture()
+  mkdirSync(sharedStore, { recursive: true })
+  chmodSync(sharedStore, 0o555)
+  try {
+    expect(() => createDesktopRuntimePnpmRunner({ ...options,
+      environment: { DSH_DESKTOP_PNPM_STORE_DIR: sharedStore },
+    })).toThrow(/EACCES/u)
+  } finally { chmodSync(sharedStore, 0o755) }
 })
