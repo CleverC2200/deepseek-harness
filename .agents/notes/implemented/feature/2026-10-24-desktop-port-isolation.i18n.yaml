@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-24-desktop-port-isolation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-24-desktop-port-isolation.md
+/agent-note-desktop-instance-port-isolation:
+  en: 7e8272ef39c6a3fd
+  zh: ce66fc811baabec7
+/agent-note-desktop-instance-port-isolation/problem:
+  en: 161ac80d1b418b13
+  zh: 470a3c006d3be41d
+/agent-note-desktop-instance-port-isolation/decision:
+  en: 7afe570e7f92e804
+  zh: f753e11d9d9623fd
+/agent-note-desktop-instance-port-isolation/alternatives-considered:
+  en: 36d9a69a6e229b03
+  zh: aa91074891dd654c
+/agent-note-desktop-instance-port-isolation/consequences:
+  en: 5a48de6e87ac1c69
+  zh: b6a709521fbcb2c0
+/agent-note-desktop-instance-port-isolation/verification-and-retirement:
+  en: a2739577fc2bda6c
+  zh: ae7aaaab7bdce8f3
