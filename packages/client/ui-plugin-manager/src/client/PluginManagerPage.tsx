@@ -1323,7 +1323,6 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       <ItemCard key={`item:${item.id}`} item={item} t={t} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: item.id }) }} />
     )),
   ]
-  // One group of cards under its heading and count; the Official group comes first, and a group with nothing in it takes no room.
   const renderGroup = (id: 'official' | 'bundles', heading: string, cards: readonly ReactNode[]): ReactNode => cards.length === 0
     ? null
     : (
@@ -1434,8 +1433,8 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
           ? <p className={css.empty}>{t('empty')}</p>
           : (
             <>
-              {renderGroup('official', t('officialTitle'), officialCards)}
               {renderGroup('bundles', t('bundlesTitle'), mine.map(packageCard))}
+              {renderGroup('official', t('officialTitle'), officialCards)}
               {/* A failed package read trails the groups it left incomplete: right under Official on a
                   first-load failure, and after the kept cards when a refresh fails over stale data. */}
               {state.status === 'error' && !refreshing

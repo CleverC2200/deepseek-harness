@@ -10,7 +10,7 @@ Company plugin updates required opening each detail page, and management occupie
 
 ## Decision
 
-`DSH-001` keeps the official page, order, icons, controls and installation/configuration controller. The same page occupies the final `settings.section`; `pluginNavigation.openBundle` uses shell-owned `settingsNavigation.open` without selecting a workspace panel. Settings renders the existing official plugin icon for this entry. The existing inventory section remains separate.
+`DSH-001` keeps the official page, icons, controls and installation/configuration controller. Installed bundles appear before the Official group so company plugins and their updates are visible first. The same page occupies the final `settings.section`; `pluginNavigation.openBundle` uses shell-owned `settingsNavigation.open` without selecting a workspace panel. Settings renders the existing official plugin icon for this entry. The existing inventory section remains separate.
 
 Installed cards show their version. The badge and action slots receive the existing bundle subject, and the group tools slot receives installed package references. Actions and the switch share the content row. Manual refresh awaits the inventory and the callbacks registered by `plugins.list.tools`. Company metadata, release sources, update transaction state and policy remain in the company plugins.
 
@@ -18,7 +18,7 @@ The desktop product main frame receives a parameterless restart operation. The e
 
 ## Alternatives considered
 
-**A new plugin page or reordered official groups.** Rejected by the user. The official page remains the single manager, with Official before Installed.
+**A new plugin page.** Rejected by the user. The official page remains the single manager.
 
 **DOM patches or bundle string replacement.** Rejected because the source would no longer express the executed layout and navigation.
 
