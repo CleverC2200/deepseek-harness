@@ -393,15 +393,14 @@ describe('PluginManagerPage', () => {
       busy: ['dsh-protected'],
     })
     const cards = screen.getAllByRole('listitem')
-    // The Official group comes first.
     expect(cards.map(card => card.getAttribute('data-plugin-package'))).toEqual([
-      '@deepseek-ai/dsh-experimental-agent-team-profile', 'dsh-better-sidebar', 'dsh-broken', 'dsh-protected', '@acme/dsh-tool', 'dsh-selected',
+      'dsh-better-sidebar', 'dsh-broken', 'dsh-protected', '@acme/dsh-tool', 'dsh-selected', '@deepseek-ai/dsh-experimental-agent-team-profile',
     ])
-    expect(cards.map(card => card.getAttribute('data-plugin-status'))).toEqual(['disabled', 'running', 'problem', 'running', 'disabled', 'problem'])
+    expect(cards.map(card => card.getAttribute('data-plugin-status'))).toEqual(['running', 'problem', 'running', 'disabled', 'problem', 'disabled'])
     // Each group heads with its title and its bare count; the official bundle carries its beta tag, no official tag.
     expect(screen.getByRole('heading', { name: en.bundlesTitle })).toBeTruthy()
     expect(screen.getByRole('heading', { name: en.officialTitle })).toBeTruthy()
-    expect([...document.querySelectorAll('[data-plugin-count]')].map(count => count.textContent)).toEqual(['1', '5'])
+    expect([...document.querySelectorAll('[data-plugin-count]')].map(count => count.textContent)).toEqual(['5', '1'])
     expect(screen.getAllByText(en.statusBeta)).toHaveLength(1)
     expect(screen.getByRole('switch', { name: en.enableToggle.replace('{name}', '@acme/dsh-tool') })).toHaveProperty('disabled', false)
     expect(screen.getByText('A sidebar.')).toBeTruthy()
@@ -432,9 +431,9 @@ describe('PluginManagerPage', () => {
       ],
     })
     expect(screen.getAllByRole('listitem').map(card => card.getAttribute('data-plugin-package'))).toEqual([
-      '@deepseek-ai/dsh-experimental-agent-team-profile', '@acme/dsh-base', 'dsh-better-sidebar',
+      '@acme/dsh-base', 'dsh-better-sidebar', '@deepseek-ai/dsh-experimental-agent-team-profile',
     ])
-    expect([...document.querySelectorAll('[data-plugin-count]')].map(count => count.textContent)).toEqual(['1', '2'])
+    expect([...document.querySelectorAll('[data-plugin-count]')].map(count => count.textContent)).toEqual(['2', '1'])
   })
 
   it.each([false, true])('shows an empty list for built-in bundles with errors and installed=%s', (installed) => {
@@ -1850,7 +1849,7 @@ it('supplies the accepted entry values and atomic mutation action to a custom pl
   expect(mutate).toHaveBeenCalledWith([{ op: 'set', path: ['count'], value: 3 }], 7)
 })
 
-it('renders installed update information and actions beside content while preserving official order', () => {
+it('lists installed bundles before official plugins with their update information and actions', () => {
   const update = vi.fn()
   renderTab({ packages: [pkg(), pkg({ name: 'official-bundle', installed: false, optional: true })] }, {}, {
     'plugins.list.badge:': () => <span>New version 0.17.0</span>,
@@ -1858,8 +1857,10 @@ it('renders installed update information and actions beside content while preser
     'plugins.list.tools:': () => <button>Update all packages</button>,
   })
   const groups = document.querySelectorAll('[data-plugin-group]')
-  expect([...groups].map(group => group.getAttribute('data-plugin-group'))).toEqual(['official', 'bundles'])
-  expect(within(groups[0] as HTMLElement).queryByText('Update package')).toBeNull()
+  expect([...groups].map(group => group.getAttribute('data-plugin-group'))).toEqual(['bundles', 'official'])
+  expect(within(groups[0] as HTMLElement).getByText('Update all packages')).toBeTruthy()
+  expect(within(groups[1] as HTMLElement).queryByText('Update package')).toBeNull()
+  expect(within(groups[1] as HTMLElement).queryByText('Update all packages')).toBeNull()
   const card = document.querySelector('[data-plugin-package="dsh-better-sidebar"]')!
   expect(card.querySelector('button[role="switch"]')?.parentElement).toBe(within(card as HTMLElement).getByText('Update package').parentElement)
   expect(within(card as HTMLElement).getByText('0.16.0')).toBeTruthy()
