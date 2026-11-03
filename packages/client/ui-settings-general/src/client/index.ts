@@ -11,6 +11,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the ctx.remote merge and its fixed Host facts.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the settings slot declarations plus the ctx.configForms Context
@@ -73,6 +74,25 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settin
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  const versionCarrier: unknown = Reflect.get(globalThis, 'dshDesktop')
+  const desktop = versionCarrier !== undefined || location.protocol === 'dsh-app:'
+  const version = createSnapshotStore<string | undefined>(desktop ? undefined : process.env.DSH_CLIENT_VERSION)
+  ctx.effect(() => {
+    let active = true
+    const readVersion = async (): Promise<void> => {
+      if (typeof versionCarrier !== 'object' || versionCarrier === null
+        || !('protocolVersion' in versionCarrier) || versionCarrier.protocolVersion !== 1
+        || !('appVersion' in versionCarrier) || typeof versionCarrier.appVersion !== 'function') return
+      try {
+        const installedVersion: unknown = await versionCarrier.appVersion()
+        if (active && typeof installedVersion === 'string' && installedVersion.trim() !== '') version.set(installedVersion)
+      } catch {
+        if (active) version.set(undefined)
+      }
+    }
+    void readVersion()
+    return () => { active = false }
+  }, 'ui-settings-general: installed desktop version')
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item', id: 'developer-tools', order: 15, locale: NS,
     inject: (): DeveloperToolsRowInjected => ({
@@ -83,6 +103,7 @@ export function apply(ctx: ClientContext): void {
   // Version information follows the core preferences.
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item', id: 'current-version', order: 100, locale: NS,
+    inject: () => ({ hooks: { version } }),
   }, CurrentVersionRow))
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-general: dictionaries')
   const connection = ctx.get('connection') as ConnectionHandle
