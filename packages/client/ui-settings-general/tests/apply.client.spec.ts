@@ -6,6 +6,7 @@
  * across Loader rebuilds of the declaring chain.
  */
 import { describe, expect, onTestFinished, vi } from 'vitest'
+import { screen, waitFor } from '@testing-library/react'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { ok, type RemoteMock } from '@deepseek-ai/dsh-remote-mock'
 import type { SettingsNamespaceView } from '@deepseek-ai/dsh-settings/types'
@@ -22,8 +23,61 @@ import type { SettingsDocumentActionInjected } from '../src/client/SettingsDocum
 const SELF = '@deepseek-ai/dsh-client-ui-settings-general'
 const SIDEBAR = '@deepseek-ai/dsh-client-ui-sidebar'
 const it = createClientTest({ roster: webApp })
+const renderedIt = createClientTest({ roster: webApp }, { mount: true })
 /** The whole roster's first boot pays the cold module transform of every plugin package. */
 const COLD_BOOT_TIMEOUT_MS = 60_000
+
+renderedIt('renders the native installed release in General Settings instead of the Core build version', async ({ start, mock }) => {
+  const release = Promise.withResolvers<string>()
+  vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3-core')
+  vi.stubGlobal('dshDesktop', { protocolVersion: 1, appVersion: () => release.promise })
+  onTestFinished(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+  const { c } = await client(mock, start)
+  c.ctx.settingsNavigation.open('general')
+  await screen.findByRole('dialog', { name: '设置' })
+  expect(screen.queryByText('当前版本：1.2.3-core')).toBeNull()
+  release.resolve('0.2.0-rc.2.20261103.1')
+  await waitFor(() => { expect(screen.getByText('当前版本：0.2.0-rc.2.20261103.1')).toBeTruthy() })
+}, COLD_BOOT_TIMEOUT_MS)
+
+for (const { name, carrier } of [
+  { name: 'missing', carrier: { protocolVersion: 1 } },
+  { name: 'rejected', carrier: { protocolVersion: 1, appVersion: async () => { throw new Error('native unavailable') } } },
+  { name: 'throwing', carrier: { protocolVersion: 1, appVersion: () => { throw new Error('bridge unavailable') } } },
+  { name: 'invalid', carrier: { protocolVersion: 1, appVersion: async () => '' } },
+]) renderedIt(`omits the installed version when the desktop API is ${name}`, async ({ start, mock }) => {
+  vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3-core')
+  vi.stubGlobal('dshDesktop', carrier)
+  onTestFinished(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+  const { c } = await client(mock, start)
+  c.ctx.settingsNavigation.open('general')
+  await screen.findByRole('dialog', { name: '设置' })
+  await c.flush()
+  expect(screen.queryByText(/^当前版本：/)).toBeNull()
+}, COLD_BOOT_TIMEOUT_MS)
+
+for (const { version, expected } of [
+  { version: '1.2.3-web', expected: '当前版本：1.2.3-web' },
+  { version: undefined, expected: undefined },
+]) renderedIt(`preserves Web build version ${String(version)} in General Settings`, async ({ start, mock }) => {
+  vi.stubEnv('DSH_CLIENT_VERSION', version)
+  onTestFinished(() => { vi.unstubAllEnvs() })
+  const { c } = await client(mock, start)
+  c.ctx.settingsNavigation.open('general')
+  await screen.findByRole('dialog', { name: '设置' })
+  if (expected === undefined) expect(screen.queryByText(/^当前版本：/)).toBeNull()
+  else expect(screen.getByText(expected)).toBeTruthy()
+}, COLD_BOOT_TIMEOUT_MS)
+
+renderedIt('omits the installed version in the desktop document when the carrier is absent', async ({ start, mock }) => {
+  vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3-core')
+  vi.stubGlobal('location', new URL('dsh-app://app/'))
+  onTestFinished(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+  const { c } = await client(mock, start)
+  c.ctx.settingsNavigation.open('general')
+  await screen.findByRole('dialog')
+  expect(screen.queryByText(/^(?:当前版本：|Current version: )/)).toBeNull()
+}, COLD_BOOT_TIMEOUT_MS)
 /** Dictionary namespace this plugin owns; every seat it fills declares it. */
 const NS = 'settings'
 

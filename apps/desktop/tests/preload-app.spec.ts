@@ -88,6 +88,40 @@ it('reads the local machine description only from the application main frame', a
   expect(electron.contextBridge.exposeInMainWorld).toHaveBeenCalledWith('dshDesktop', { protocolVersion: 1 })
 })
 
+it('reads the installed release through a parameterless native API', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/index.html'))
+  electron.ipcRenderer.invoke.mockResolvedValueOnce('0.2.0-rc.2.20261103.1')
+  await import('../src/preload-app.ts')
+  const api: unknown = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1]
+  if (typeof api !== 'object' || api === null || !('appVersion' in api) || typeof api.appVersion !== 'function') {
+    throw new Error('missing appVersion bridge')
+  }
+  await expect(api.appVersion()).resolves.toBe('0.2.0-rc.2.20261103.1')
+  expect(electron.ipcRenderer.invoke).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.appVersion)
+})
+
+it.each(['', '   ', null, 20261103])('rejects an invalid native version response %s', async (value) => {
+  vi.stubGlobal('location', new URL('dsh-app://app/index.html'))
+  electron.ipcRenderer.invoke.mockResolvedValueOnce(value)
+  await import('../src/preload-app.ts')
+  const api: unknown = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1]
+  if (typeof api !== 'object' || api === null || !('appVersion' in api) || typeof api.appVersion !== 'function') {
+    throw new Error('missing appVersion bridge')
+  }
+  await expect(api.appVersion()).rejects.toThrow('invalid application version')
+})
+
+it('preserves native version read failures without returning a build version', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/index.html'))
+  electron.ipcRenderer.invoke.mockRejectedValueOnce(new Error('native read failed'))
+  await import('../src/preload-app.ts')
+  const api: unknown = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1]
+  if (typeof api !== 'object' || api === null || !('appVersion' in api) || typeof api.appVersion !== 'function') {
+    throw new Error('missing appVersion bridge')
+  }
+  await expect(api.appVersion()).rejects.toThrow('native read failed')
+})
+
 it('exposes asynchronous boot only to the local application document', async () => {
   vi.stubGlobal('location', new URL('dsh-app://app/'))
   await import('../src/preload-app.ts')

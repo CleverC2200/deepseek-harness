@@ -15,6 +15,11 @@ function createProductApi(): DshDesktopProductApi {
     protocolVersion: 1,
     browser: createDesktopBrowserBridge(),
     deviceInfo: () => ipcRenderer.invoke(DESKTOP_IPC.deviceInfo) as Promise<string>,
+    appVersion: async () => {
+      const version: unknown = await ipcRenderer.invoke(DESKTOP_IPC.appVersion)
+      if (typeof version !== 'string' || version.trim() === '') throw new Error('dsh desktop: invalid application version')
+      return version
+    },
     keyboard: {
       closeWindow: revision => ipcRenderer.invoke(DESKTOP_IPC.shortcutsCloseWindow, revision) as Promise<void>,
       subscribe: (listener) => {
