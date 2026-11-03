@@ -110,6 +110,11 @@ export function apply(ctx: ClientContext): void {
   const carrier = (globalThis as typeof globalThis & { dshDesktop?: { protocolVersion: number; updates?: DesktopUpdateBridge } }).dshDesktop
   const desktopUpdate = new DesktopUpdateSource(carrier?.protocolVersion === 1 ? carrier.updates : undefined)
   ctx.effect(() => () => { desktopUpdate.dispose() }, 'ui-settings-general: desktop update carrier')
+  ctx.slots.inject('settings.update', () => {
+    const refresh = () => { desktopUpdate.setEnabled(ctx.slots.entries('settings.update').length === 0) }
+    refresh()
+    return ctx.slots.subscribe('settings.update', refresh)
+  })
   ctx.slots.inject('sidebar.toggle.badge', () => ctx.slots.register({
     name: 'sidebar.toggle.badge', locale: NS,
     inject: () => ({ hooks: { desktopUpdate: desktopUpdate.store, connectionState: connection.state } }),
@@ -224,6 +229,7 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       store: shellStore,
       children: {
+        'settings.update': { kind: 'single', scope: 'root' },
         'settings.launcher': { kind: 'single', scope: 'root' },
         'settings.trigger': { kind: 'single', scope: 'root' },
         'settings.header': { kind: 'single', scope: 'root' },
