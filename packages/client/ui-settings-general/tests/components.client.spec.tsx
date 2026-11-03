@@ -229,20 +229,18 @@ describe('current version', () => {
     ['Current version: 1.2.3-rc.4', en],
     ['当前版本：1.2.3-rc.4', zh],
   ])('renders the localized release label %s', (expected, dictionary) => {
-    vi.stubEnv('DSH_CLIENT_VERSION', '1.2.3-rc.4')
     const translate: TriggerContentProps['t'] = (key, params) => {
       let text = (dictionary as Record<string, string>)[key] ?? key
       for (const [name, value] of Object.entries(params ?? {})) text = text.replace(`{${name}}`, String(value))
       return text
     }
-    render(<CurrentVersionRow {...kit} t={translate} />)
+    render(<CurrentVersionRow {...kit} t={translate} useVersion={bindSnapshotSelector(createSnapshotStore<string | undefined>('1.2.3-rc.4'))} />)
     expect(screen.getByText(expected)).toBeTruthy()
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('omits the row when a partial build has no version metadata', () => {
-    vi.stubEnv('DSH_CLIENT_VERSION', undefined)
-    const view = render(<CurrentVersionRow {...kit} t={t} />)
+  it('omits the row when the current version is unavailable', () => {
+    const view = render(<CurrentVersionRow {...kit} t={t} useVersion={bindSnapshotSelector(createSnapshotStore<string | undefined>(undefined))} />)
     expect(view.container.textContent).toBe('')
   })
 })
