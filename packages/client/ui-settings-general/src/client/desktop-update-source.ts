@@ -7,32 +7,51 @@ export class DesktopUpdateSource {
   /** Framework-observed carrier status shared by both sidebar controls. */
   readonly store = createSnapshotStore<DesktopUpdateView>({ failed: false, opening: false })
   private live = true
-  private received = false
-  private readonly unsubscribe: (() => void) | undefined
+  private generation = 0
+  private enabled = false
+  private unsubscribe: (() => void) | undefined
 
   /** @param bridge - Optional isolated Electron API, absent in ordinary browsers. */
   constructor(private readonly bridge: DesktopUpdateBridge | undefined) {
-    this.unsubscribe = bridge?.subscribe((presentation) => {
-      if (!this.live) return
-      this.received = true
+    this.setEnabled(true)
+  }
+
+  setEnabled(enabled: boolean): void {
+    if (!this.live || this.enabled === enabled) return
+    this.enabled = enabled
+    const generation = ++this.generation
+    this.unsubscribe?.()
+    this.unsubscribe = undefined
+    if (!enabled) {
+      this.store.set({ failed: false, opening: this.store.getSnapshot().opening })
+      return
+    }
+    if (this.bridge === undefined) return
+    let received = false
+    this.unsubscribe = this.bridge.subscribe((presentation) => {
+      if (!this.live || generation !== this.generation) return
+      received = true
       this.store.set({ ...this.store.getSnapshot(), presentation, failed: false })
     })
-    void bridge?.status().then((presentation) => {
-      if (this.live && !this.received) this.store.set({ ...this.store.getSnapshot(), presentation })
+    void this.bridge.status().then((presentation) => {
+      if (this.live && generation === this.generation && !received) {
+        this.store.set({ ...this.store.getSnapshot(), presentation, failed: false })
+      }
     }, () => {
-      if (this.live && !this.received) this.store.set({ ...this.store.getSnapshot(), failed: true })
+      if (this.live && generation === this.generation && !received) this.store.set({ ...this.store.getSnapshot(), failed: true })
     })
   }
 
   /** Invoke one user action; subsequent clicks join the shell-owned operation. */
   open(): void {
-    if (!this.live || this.bridge === undefined) return
+    if (!this.live || !this.enabled || this.bridge === undefined) return
     const state = this.store.getSnapshot()
     if (state.opening || (state.presentation !== undefined
       && ['checking', 'downloading', 'verifying', 'installing'].includes(state.presentation.phase))) return
+    const generation = this.generation
     this.store.set({ ...state, opening: true })
     void this.bridge.open().catch(() => {
-      if (this.live) this.store.set({ ...this.store.getSnapshot(), failed: true })
+      if (this.live && generation === this.generation) this.store.set({ ...this.store.getSnapshot(), failed: true })
     }).finally(() => {
       if (this.live) this.store.set({ ...this.store.getSnapshot(), opening: false })
     })

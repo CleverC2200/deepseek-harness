@@ -27,6 +27,7 @@ function injectedOf(c: TestClient): SettingsRootInjected {
 
 /** The shell's child declarations (chrome, actions, sections, and onboarding overlays). */
 const CHILD_SPECS = {
+  'settings.update': { kind: 'single', scope: 'root' },
   'settings.launcher': { kind: 'single', scope: 'root' },
   'settings.trigger': { kind: 'single', scope: 'root' },
   'settings.header': { kind: 'single', scope: 'root' },
@@ -75,6 +76,42 @@ describe('ui-settings-general shell', () => {
     expect(c.ctx.slots.entries('sidebar.toggle.badge')).toHaveLength(0)
     publish!({ phase: 'error', version: status.version, failure: 'install' })
     expect(row.hooks.desktopUpdate.getSnapshot().presentation).toEqual(status)
+  }, COLD_BOOT_TIMEOUT_MS)
+
+  it('hands carrier observation to a replacement update entry and restores the fallback after removal', async ({ start }) => {
+    const first = Promise.withResolvers<DesktopUpdatePresentation>()
+    const next = Promise.withResolvers<DesktopUpdatePresentation>()
+    const action = Promise.withResolvers<undefined>()
+    const listeners: ((state: DesktopUpdatePresentation) => void)[] = []
+    const off = vi.fn()
+    const status = vi.fn().mockReturnValueOnce(first.promise).mockReturnValue(next.promise)
+    const subscribe = vi.fn((listener: (state: DesktopUpdatePresentation) => void) => { listeners.push(listener); return off })
+    const open = vi.fn(() => action.promise)
+    vi.stubGlobal('dshDesktop', { protocolVersion: 1, updates: { status, subscribe, open } })
+    onTestFinished(() => { vi.unstubAllGlobals(); first.resolve({ phase:'idle' }); next.resolve({ phase:'idle' }); action.resolve(undefined) })
+    const c = await start()
+    const row = injectedOf(c)
+    listeners[0]!({ phase:'available',version:'old' })
+    row.openDesktopUpdate()
+    const remove = c.ctx.slots.register({ name:'settings.update',priority:-10 }, () => null)
+    await c.flush()
+    expect(off).toHaveBeenCalledOnce()
+    expect(row.hooks.desktopUpdate.getSnapshot().presentation).toBeUndefined()
+    expect(open).toHaveBeenCalledOnce()
+    remove()
+    await c.flush()
+    expect(subscribe).toHaveBeenCalledTimes(2)
+    listeners[1]!({ phase:'ready',version:'new' })
+    listeners[0]!({ phase:'error',version:'old',failure:'download' })
+    first.resolve({ phase:'idle' })
+    action.reject(new Error('previous observer action'))
+    await c.flush()
+    expect(row.hooks.desktopUpdate.getSnapshot().presentation).toEqual({ phase:'ready',version:'new' })
+    expect(row.hooks.desktopUpdate.getSnapshot().failed).toBe(false)
+    await c.unload(SELF)
+    await c.flush()
+    expect(off).toHaveBeenCalledTimes(2)
+    expect(subscribe).toHaveBeenCalledTimes(2)
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('declares its services', () => {

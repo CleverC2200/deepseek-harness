@@ -40,6 +40,7 @@ const noAttention: AttentionSnapshot = new Map()
 const useSessionStatus: SettingsRootComponentProps['useSessionStatus'] = selector => selector(noAttention)
 
 function mount({
+  updateEntry,
   shortcuts = [],
   wide = true,
   dictionary = en,
@@ -57,6 +58,7 @@ function mount({
     { id: 'credential', order: 0 },
   ],
 }: {
+  updateEntry?: import('react').ReactNode
   shortcuts?: readonly ShortcutCatalogEntry[]
   wide?: boolean
   dictionary?: typeof en | typeof zh
@@ -76,6 +78,7 @@ function mount({
   const reconnect = vi.fn()
   const renderSlot = vi.fn(
     ((key: string, _owner: unknown, opts?: { only?: string; fallback?: import('react').ReactNode }) => {
+      if (key === 'settings.update' && updateEntry) return updateEntry
       if (key === 'settings.section') return <div data-testid={`section-${opts?.only ?? 'all'}`} />
       return SEAT_CONTENT[key] ?? opts?.fallback
     }) as SettingsRootComponentProps['renderSlot'],
@@ -526,4 +529,11 @@ it('passes current Settings key labels to the launcher and removes them when unb
 
   setShortcuts([{ ...row, keys: [], aria: undefined, binding: null, modified: true }])
   expect(launcher()).not.toHaveProperty('settingsShortcut')
+})
+
+it('replaces the desktop update fallback with a company update entry', () => {
+  mount({ dictionary: zh, desktopUpdate: { failed: false, opening: false, presentation: { phase: 'available', version: 'next' } },
+    updateEntry: <button>统一更新</button> })
+  expect(screen.getByRole('button', { name: '统一更新' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '新版本' })).toBeNull()
 })

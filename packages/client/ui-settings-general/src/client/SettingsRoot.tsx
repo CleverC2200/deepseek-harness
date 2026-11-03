@@ -241,8 +241,10 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
           restartActionLabel={t('connection.restart')}
           onReconnect={reconnect}
         />
-        <DesktopUpdateIndicator wide={wide} hidden={connectionIndicator !== undefined && desktopUpdate.presentation?.phase !== 'installing'}
-          t={t} view={desktopUpdate} onOpen={openDesktopUpdate} />
+        {renderSlot('settings.update', { wide, hidden: connectionIndicator !== undefined && desktopUpdate.presentation?.phase !== 'installing' }, {
+          fallback: <DesktopUpdateIndicator wide={wide} hidden={connectionIndicator !== undefined && desktopUpdate.presentation?.phase !== 'installing'}
+            t={t} view={desktopUpdate} onOpen={openDesktopUpdate} />,
+        })}
       </div>
       {open && (
         <SettingsPanel
