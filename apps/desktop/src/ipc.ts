@@ -26,6 +26,7 @@ export const DESKTOP_IPC = {
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
   localeChanged: 'dsh-desktop:locale-changed',
   updatesStatus: 'dsh-desktop:updates-status',
+  updatesCheck: 'dsh-desktop:updates-check',
   updatesOpen: 'dsh-desktop:updates-open',
   restart: 'dsh-desktop:restart',
   updatesPresentation: 'dsh-desktop:updates-presentation',
@@ -84,8 +85,9 @@ export interface DshDesktopProductApi {
   appVersion(): Promise<string>
   restart(): Promise<boolean>
   readonly updates: {
+    check(): Promise<DesktopUpdatePresentation>
     status(): Promise<DesktopUpdatePresentation>
-    open(): Promise<void>
+    open(version?: string): Promise<void>
     subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
   }
 }
