@@ -675,10 +675,31 @@ describe('desktop main startup', () => {
     }
   })
 
+  it('rejects a stale prepared target before opening the native updater', async () => {
+    await readyForUpdate()
+    harness.updateState = { phase: 'available', version: '1.1.0' }
+    const sender = harness.windows[0]!.webContents
+    await expect(harness.handlers.get(DESKTOP_IPC.updatesOpen)!({ sender, senderFrame: sender.mainFrame }, '1.2.0')).rejects.toThrow('confirmed target changed')
+    expect(harness.updateDownload).not.toHaveBeenCalled()
+    expect(harness.updateInstall).not.toHaveBeenCalled()
+  })
+
+  it('checks update metadata without downloading, installing or showing a confirmation', async () => {
+    await readyForUpdate()
+    const sender = harness.windows[0]!.webContents
+    harness.updateState = { phase: 'available', version: '1.1.0' }
+    const confirmations = harness.dialog.showMessageBox.mock.calls.length
+    const result = await harness.handlers.get(DESKTOP_IPC.updatesCheck)!({ sender, senderFrame: sender.mainFrame })
+    expect(result).toMatchObject({ phase: 'available' })
+    expect(harness.updateDownload).not.toHaveBeenCalled()
+    expect(harness.updateInstall).not.toHaveBeenCalled()
+    expect(harness.dialog.showMessageBox.mock.calls).toHaveLength(confirmations)
+  })
+
   it('accepts product IPC only from the current application top frame in the owned main window', async () => {
     await readyForUpdate()
     const sender = harness.windows[0]!.webContents
-    for (const channel of [DESKTOP_IPC.updatesStatus, DESKTOP_IPC.deviceInfo, DESKTOP_IPC.appVersion]) {
+    for (const channel of [DESKTOP_IPC.updatesCheck, DESKTOP_IPC.updatesStatus, DESKTOP_IPC.deviceInfo, DESKTOP_IPC.appVersion]) {
       const handler = harness.handlers.get(channel)!
       expect(() => handler({ sender, senderFrame: sender.mainFrame })).not.toThrow()
       for (const event of [

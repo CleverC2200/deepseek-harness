@@ -764,6 +764,10 @@ async function main(): Promise<void> {
     windowsLanguage = locale.id
     refreshApplicationMenu()
   })
+  ipcMain.handle(DESKTOP_IPC.updatesCheck, (event) => {
+    assertProductSender(event)
+    return updateSchedule.check(true).then(presentDesktopUpdate)
+  })
   ipcMain.handle(DESKTOP_IPC.updatesStatus, (event) => {
     assertProductSender(event)
     return presentDesktopUpdate(updates.state)
@@ -791,14 +795,15 @@ async function main(): Promise<void> {
       if (width < 960) window.setSize(960, height)
     }
   })
-  ipcMain.handle(DESKTOP_IPC.updatesOpen, async (event) => {
+  ipcMain.handle(DESKTOP_IPC.updatesOpen, async (event, version?: unknown) => {
     assertProductSender(event)
-    await openUpdatePrompt()
+    if (version !== undefined && (typeof version !== 'string' || version !== updates.state.version)) throw new Error('desktop update: confirmed target changed')
+    await openUpdatePrompt(false, version)
   })
 
   let promptOperation: Promise<void> | undefined
   let policyAuthenticationQueued = false
-  const openUpdatePrompt = (manual = false): Promise<void> => {
+  const openUpdatePrompt = (manual = false, expectedVersion?: string): Promise<void> => {
     if (authenticationOperation !== undefined) {
       policyAuth?.focus(); updateDialog.focus()
     }
@@ -828,6 +833,7 @@ async function main(): Promise<void> {
           state = await updateSchedule.check(true)
         }
         if (isMandatory()) { mandatoryUI?.focus(); return }
+        if (expectedVersion !== undefined && state.version !== expectedVersion) throw new Error('desktop update: confirmed target changed')
         if (state.phase === 'error' && state.failedOperation === 'check') { await showUpdateFailure(state); return }
         if (state.phase === 'idle') {
           await ordinaryMessageBox({ type: 'info', title: locale.messages.updateCheckTitle,

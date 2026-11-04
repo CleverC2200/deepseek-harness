@@ -25,6 +25,7 @@ function fixture() {
   const unsubscribe = vi.fn()
   const open = vi.fn(async () => {})
   const bridge: DesktopUpdateBridge = {
+    check: () => status.promise,
     status: () => status.promise,
     open,
     subscribe: (next) => { listener = next; return unsubscribe },
