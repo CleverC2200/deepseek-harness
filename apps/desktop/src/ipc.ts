@@ -85,8 +85,9 @@ export interface DshDesktopProductApi {
   appVersion(): Promise<string>
   restart(): Promise<boolean>
   readonly updates: {
+    check(): Promise<DesktopUpdatePresentation>
     status(): Promise<DesktopUpdatePresentation>
-    open(): Promise<void>
+    open(version?: string): Promise<void>
     subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
   }
 }
