@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-04-desktop-update-check.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-04-desktop-update-check.md
+/agent-note-desktop-update-metadata-check:
+  en: 2fe63a48ee6ead49
+  zh: d00bfef5dd41e10d
+/agent-note-desktop-update-metadata-check/problem:
+  en: 03588b52b232a812
+  zh: 8770bd5da66f2f0f
+/agent-note-desktop-update-metadata-check/decision:
+  en: 3645bc831a1894d4
+  zh: 5fb24a9439608ee4
+/agent-note-desktop-update-metadata-check/alternatives-considered:
+  en: fab7ade0e2d933dd
+  zh: 41a1d3e25682d530
+/agent-note-desktop-update-metadata-check/consequences:
+  en: eff0e0ee9f79b951
+  zh: 6980cc87ea612090
+/agent-note-desktop-update-metadata-check/verification-and-retirement:
+  en: d6b8ffb412c2c0f8
+  zh: 08f50c66bc107d67
