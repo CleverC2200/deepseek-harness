@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   appListeners: new Map<string, (...args: unknown[]) => void>(),
   dialogLocale: undefined as (() => DesktopLocale) | undefined,
   beforeRead: vi.fn(async () => {}),
+  connectWelcome: vi.fn<(...args: Parameters<typeof import('../src/welcome-backend.ts').connectDesktopWelcome>) => void>(),
   beforeWelcome: vi.fn(async () => {}),
   copy: vi.fn(),
   expiryListener: undefined as (() => void) | undefined,
@@ -122,23 +123,26 @@ vi.mock('../src/host-process.ts', () => ({
   },
 }))
 vi.mock('../src/welcome-backend.ts', () => ({
-  connectDesktopWelcome: async () => ({
-    analyticsEnabled: async () => false,
-    readLocalePreference: async () => state.preference,
-    read: async () => {
-      await state.beforeRead()
-      return { loggedIn: false, hasApiKey: state.hasApiKey, writable: true, localePreference: state.preference }
-    },
-    save: async () => ({ ok: true }),
-    account: {
-      watch: (listener: (value: AccountView) => void, _failed: () => void, expired: () => void) => {
-        state.accountListener = listener
-        state.expiryListener = expired
-        return () => {}
+  connectDesktopWelcome: async (...args: Parameters<typeof import('../src/welcome-backend.ts').connectDesktopWelcome>) => {
+    state.connectWelcome(...args)
+    return {
+      analyticsEnabled: async () => false,
+      readLocalePreference: async () => state.preference,
+      read: async () => {
+        await state.beforeRead()
+        return { loggedIn: false, hasApiKey: state.hasApiKey, writable: true, localePreference: state.preference }
       },
-      state: state.accountState,
-    },
-  }),
+      save: async () => ({ ok: true }),
+      account: {
+        watch: (listener: (value: AccountView) => void, _failed: () => void, expired: () => void) => {
+          state.accountListener = listener
+          state.expiryListener = expired
+          return () => {}
+        },
+        state: state.accountState,
+      },
+    }
+  },
 }))
 vi.mock('node:fs/promises', async importOriginal => ({
   ...await importOriginal<typeof import('node:fs/promises')>(),
@@ -213,6 +217,7 @@ it.each([false, true])('starts welcome onboarding without carrying update focus 
   }
   await vi.waitFor(() => { expect(state.operations).toBeDefined() })
   expect(state.startHost).toHaveBeenCalledOnce()
+  expect(state.connectWelcome).toHaveBeenCalledExactlyOnceWith('http://127.0.0.1:3080/?token=test', 'test-cookie')
   expect(state.loadWorkspace).toHaveBeenCalledExactlyOnceWith('dsh-app://app/')
   expect(state.showWorkspace).not.toHaveBeenCalled()
   state.loadWorkspace.mockClear()
