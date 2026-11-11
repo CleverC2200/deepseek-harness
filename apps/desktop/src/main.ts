@@ -552,7 +552,7 @@ async function main(): Promise<void> {
       window.webContents.send(DESKTOP_IPC.updatesPresentation, presentDesktopUpdate(state))
     }
     if (state.phase === 'error' && state.failedOperation !== 'check') {
-      const restoreHost = state.failedOperation === 'install' && updateStoppedHost && !quitting
+      const restoreHost = state.failedOperation === 'install' && updateStoppedHost && !quitting && !desktopUpdating()
       shellInstallerOwnsQuit = false
       updateStoppedHost = false
       if (restoreHost) {

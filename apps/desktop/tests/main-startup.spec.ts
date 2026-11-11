@@ -1391,6 +1391,46 @@ describe('desktop main startup', () => {
     expect(harness.app.relaunch).not.toHaveBeenCalled()
   })
 
+  it('keeps a failed takeover installer stopped until native recovery locks the replacement Host', async () => {
+    const host = await readyForUpdate()
+    await invoke(DESKTOP_IPC.boot, 'app')
+    harness.updateState = { phase: 'available', version: '2.0.0' }
+    harness.updateDownload.mockResolvedValueOnce({ phase: 'ready', version: '2.0.0' })
+    harness.updateInstall.mockImplementationOnce(async () => {
+      await harness.prepareUpdate()
+      return harness.publishUpdate({ phase: 'error', version: '2.0.0', failedOperation: 'install', message: 'Installer failed' })
+    })
+    const answer = Promise.withResolvers<{ response: number }>()
+    let shown = false
+    harness.dialog.showMessageBox.mockImplementation((options: MessageBoxOptions) => {
+      if (options.message === en.takeoverUnknown && !shown) { shown = true; return answer.promise }
+      return new Promise(() => {})
+    })
+    const pending = invoke(DESKTOP_IPC.updatesRestart, 'app', { kind: 'desktop', version: '2.0.0' })
+    await host.stopping.promise
+    host.exited.resolve()
+    await pending
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.hosts).toHaveLength(1)
+    expect(() => invoke(DESKTOP_IPC.restart, 'app')).toThrow(/updating/)
+    answer.resolve({ response: 0 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.hosts).toHaveLength(2)
+    const replacement = harness.hosts[1]!
+    const locked = Promise.withResolvers<boolean>()
+    replacement.updateTasks.mockImplementationOnce(() => locked.promise)
+    replacement.updateOperation.mockResolvedValue({ ok: true, value: { operationId: 'native-one', state: 'idle' } })
+    replacement.ready.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(replacement.updateTasks).toHaveBeenCalledExactlyOnceWith('lock')
+    expect(harness.windows[0]!.urls).toEqual(['dsh-app://app/'])
+    expect(() => invoke(DESKTOP_IPC.restart, 'app')).toThrow(/updating/)
+    locked.resolve(false)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.windows[0]!.urls).toEqual(['dsh-app://app/', 'dsh-app://app/'])
+    expect(replacement.updateTasks.mock.calls).toEqual([['lock'], ['unlock']])
+  })
+
   it('takes over plugin restart once and rejects ordinary IPC while waiting for clean Host exit', async () => {
     const host = await readyForUpdate()
     await invoke(DESKTOP_IPC.boot, 'app')
