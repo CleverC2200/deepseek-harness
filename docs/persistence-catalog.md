@@ -538,7 +538,7 @@ Source: [`packages/feedback/message-feedback/src/types.ts:56`](../packages/feedb
 'feedback/record': FeedbackRecord
 ```
 
-Source: [`packages/feedback/command-feedback/src/types.ts:40`](../packages/feedback/command-feedback/src/types.ts)
+Source: [`packages/feedback/command-feedback/src/types.ts:41`](../packages/feedback/command-feedback/src/types.ts)
 
 ### `goal/*`
 
@@ -3294,7 +3294,7 @@ Sources: [`packages/schedule/schedule/src/types.ts:244`](../packages/schedule/sc
 
 SHA-256: `7d54a5a5e629e2e7783bfac72683bcc5e969e9f43426b9289826aaf294ff6344`
 
-Sources: [`packages/feedback/command-feedback/src/types.ts:27`](../packages/feedback/command-feedback/src/types.ts)
+Sources: [`packages/feedback/command-feedback/src/types.ts:28`](../packages/feedback/command-feedback/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|

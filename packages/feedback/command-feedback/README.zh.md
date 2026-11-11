@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-command-feedback` 让用户告诉 harness 他们对会话的看法。输入 `/feedback` 加一条评价，评价即被记录，并以会话 id 与匿名用户 id 确认；Web 反馈弹窗通过 `sessionFeedback` Host Remote 记录分类与可选描述。记录是即时的，绝不会启动模型工作：模型既看不到这条评价，也不会被打断。本包同时拥有所有反馈界面共用的固定分类表。它随标准 `dsh` 基础组合交付，无需任何配置；无头模式、ACP（Agent Client Protocol）与 JSON-RPC 入口不提供斜杠命令。
+`dsh-command-feedback` 保留本地反馈记录，并提供产品提交处理注册。`/feedback <text>` 和 `sessionFeedback.record` 追加仅写日志的事件；会话弹窗调用 `sessionFeedback.submit`，由挂载的产品负责材料收集、上传并返回 `reportId、receivedAt`。反馈不启动模型工作。
 
 ## 目录
 
@@ -41,7 +41,10 @@ kind: "package-reference"
 <a id="the-web-feedback-dialog"></a>
 ### Web 反馈弹窗
 
-在 Web 客户端中，不带文本的 `/feedback`（从输入框菜单选中，或直接输入后发送）会打开反馈弹窗，而不是返回用法错误。弹窗提供下表的七个分类和一个自由文本框；每一项都可不填，空提交也会被接受，对话日志和其他反馈事件一样随记录的事件一起投递。弹窗通过 `sessionFeedback.record` 记录，追加的是同一个 `feedback/record` 事件，但没有命令簿记，也没有确认行；弹窗改用 toast 提示。
+不带文本的 `/feedback` 打开现有会话弹窗。描述去除首尾空白后必填，最多 4000 字符且不含 NUL。弹窗调用 `sessionFeedback.submit` 并显示产品回执；处理未注册或提交失败时保留草稿，不以本地记录作为成功。下列七个分类继续用于本地记录和消息反馈。
+
+
+产品在 effect 生命周期内通过 `ctx.sessionFeedback.registerSubmit(handler)` 注册唯一 `SessionFeedbackSubmitHandler`，并使用返回的 disposer 卸载。输入为 `{sessionId, description}`，结果为回执或可展示错误。身份、固定快照、上传和重试由提供者负责。Remote 变更时必须同步构建 Host 反射和 `api-remotes` Client 汇总包。
 
 | 分类 id | 含义 |
 |---|---|

@@ -272,6 +272,39 @@ type SessionFeedbackRecordResult =
   | { readonly ok: false; readonly error: SessionFeedbackSessionNotFound }
 ```
 
+```ts type-equiv
+/** Opaque report identity assigned by the product feedback service. */
+type SessionFeedbackReportId = Branded<'SessionFeedbackReportId'>
+```
+
+```ts type-equiv
+/** Acknowledgement of an accepted product feedback submission. */
+interface SessionFeedbackReceipt {
+  readonly reportId: SessionFeedbackReportId
+  readonly receivedAt: string
+}
+```
+
+```ts type-equiv
+/** Live Session and required description for one product feedback submission. */
+interface SessionFeedbackSubmitRequest {
+  readonly sessionId: SessionId
+  readonly description: string
+}
+```
+
+```ts type-equiv
+/** Accepted receipt or a recoverable submission failure. */
+type SessionFeedbackSubmitResult =
+  | { readonly ok: true; readonly value: SessionFeedbackReceipt }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message?: string } }
+```
+
+```ts type-equiv
+/** Product-owned submission provider; its optional failure message is safe to display. */
+type SessionFeedbackSubmitHandler = (request: SessionFeedbackSubmitRequest) => Promise<SessionFeedbackSubmitResult>
+```
+
 ## Data and concurrency
 
 Current items are folded from canonical feedback events whose payload `sessionId` matches the owning Session. Each item carries a positive or negative rating, an optional note, an optional category, Host-assigned `createdAt`/`updatedAt` timestamps, and its own opaque version. Versions are compared only for equality and only against the addressed message; callers do not order or synthesize them.
@@ -286,7 +319,7 @@ Fork seeds can contain parent feedback events, but their payload retains the par
 
 ## Persistence and Remote contract
 
-Successful message-feedback mutations await canonical persistence: live operations append through the owning Session and require a participating `ctx.sessions.flush` listener; cold operations append and flush through their write handle. Persistence failures propagate rather than reporting success. `maxNoteBytes` is required and bounds note text by UTF-8 bytes; the Web Host composition sets `8192`. The package publishes the Host `messageFeedback.list`, `messageFeedback.put`, and `messageFeedback.delete` unary Remote contract through `TypertRemoteService` and `@Remote`; `command-feedback` publishes `sessionFeedback.record` the same way for Session-level remarks on live Sessions. The generated Cordis API below is the method-level authority.
+Successful message-feedback mutations await canonical persistence: live operations append through the owning Session and require a participating `ctx.sessions.flush` listener; cold operations append and flush through their write handle. Persistence failures propagate rather than reporting success. `maxNoteBytes` is required and bounds note text by UTF-8 bytes; the Web Host composition sets `8192`. The package publishes the Host `messageFeedback.list`, `messageFeedback.put`, and `messageFeedback.delete` unary Remote contract through `TypertRemoteService` and `@Remote`; `command-feedback` publishes `sessionFeedback.record` the same way for Session-level remarks on live Sessions, alongside the separate product-owned `sessionFeedback.submit` operation. The generated Cordis API below is the method-level authority.
 
 Plugin disposal closes operation admission and drains accepted per-Session queue work.
 
@@ -300,7 +333,7 @@ The controls are the `feedback` entry (order 10) of the `conversation.chat.assis
 
 One `MessageFeedbackController` per Session backs every message control in that Session: a single `list` read seeds the whole transcript, deferred to first hover or focus rather than fired on mount. Each mutation sends the version that controller last observed as `ifVersion`; a `version-conflict` reply carries the authoritative item, so the controller reconciles from the reply instead of refetching. Mutations serialize per Session so a queued operation compares against the committed version. The injected `retract` operation rechecks the committed rating inside that queue and becomes a no-op after a concurrent change, so stale UI cannot bypass the dialog by recording a bare rating. A `connection/reset` refreshes only Sessions already read.
 
-Either unrecorded rating opens the Session's feedback dialog, the `feedback-dialog` entry of `conversation.input.overlay`: the shared Modal card with seven category chips and a detail box. Submit puts the selected judgment carrying the chosen category and the trimmed description, or neither; success closes the dialog and shows the acknowledgement toast, while failure keeps the dialog and draft open and shows a warning toast. The same dialog opens for the Session from a bare `/feedback` — a decoration `ui-commands` routes as an `action` — and then records through `sessionFeedback.record`; `/feedback <text>` keeps the Host command path. Clicking a recorded rating retracts it without opening the dialog.
+Either unrecorded rating opens the Session's feedback dialog with seven category chips and an optional detail box. Submit records the message rating, category and trimmed description through `messageFeedback.put`. A bare `/feedback` or the Session menu opens a description-only form that calls `sessionFeedback.submit`; it requires 1–4000 trimmed characters and displays the product receipt only after acceptance. A failure preserves the draft, and a missing provider reports submission unavailable. `/feedback <text>` retains the Host command path and `feedback/record` event. Clicking a recorded rating retracts it without opening the dialog.
 
 ## Boundaries and limitations
 
@@ -311,8 +344,8 @@ Either unrecorded rating opens the Session's feedback dialog, the `feedback-dial
 - The Host contract records no authenticated actor or audit identity and therefore assumes a trusted caller boundary.
 - The Web controls appear in the chat view only. The trajectory and waterfall views render no feedback entry even though their assistant nodes carry the same `messageId`.
 - The Web controller does not consume feedback log events, so a second tab's rating becomes visible on reconnect or on the next conflict reply rather than immediately.
-- The dialog does not pre-check `maxNoteBytes`; an oversized description for a message fails on submit with `note-too-large` rather than while typing. A Session remark has no size bound, as the `/feedback` command never had one.
-- `sessionFeedback.record` serves live Sessions only and answers `session-not-found` otherwise; the dialog reports that failure when its Session retires while it is open.
+- Message notes are checked by the Host against `maxNoteBytes`. Product Session descriptions are checked by the client and Host; the product provider owns authentication, material collection and upload.
+- `sessionFeedback.record` and `sessionFeedback.submit` require a live Session. Product submission does not append `feedback/record` or authorize the existing telemetry release path.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -361,6 +394,20 @@ Source: [`packages/feedback/message-feedback/src/index.ts`](../../packages/feedb
 Host Remote through which a product surface records a Session-level remark.
 
 ```ts cordis-catalog
+/**
+ * Install the single product submission provider.
+ * @param handler - product-owned upload operation, including authorization.
+ * @returns disposer that releases this provider only.
+ */
+registerSubmit(handler: SessionFeedbackSubmitHandler): () => void
+
+/**
+ * Submit a non-empty description through the installed product provider.
+ * @param request - live Session and a description of at most 4000 characters.
+ * @returns accepted receipt or a failure, including when no provider is installed.
+ */
+@Remote('submit') async submit(request: SessionFeedbackSubmitRequest): Promise<SessionFeedbackSubmitResult>
+
 /**
  * Record one remark on a live Session.
  * @param request - target Session plus the optional text and category.

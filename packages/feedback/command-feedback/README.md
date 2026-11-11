@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-command-feedback` lets a user tell the harness what they think of a session. Typing `/feedback` plus a remark records it and acknowledges the session and anonymous user ids; the Web feedback dialog records a category and an optional description through the `sessionFeedback` Host Remote. Recording is immediate and never starts model work: the model neither sees the remark nor is interrupted by it. The package also owns the fixed category taxonomy every feedback surface files under. It ships with the standard `dsh` base and needs no configuration; headless, ACP, and JSON-RPC entry points provide no slash commands.
+`dsh-command-feedback` keeps local feedback recording and exposes a product submission provider. `/feedback <text>` and `sessionFeedback.record` append log-only events. The Session dialog calls `sessionFeedback.submit`; the mounted product owns collection and upload and must return `reportId` and `receivedAt`. Feedback never starts model work.
 
 ## Table of Contents
 
@@ -41,7 +41,10 @@ Surrounding whitespace is trimmed, but the remark is otherwise kept exactly as t
 <a id="the-web-feedback-dialog"></a>
 ### The Web feedback dialog
 
-In the Web client a bare `/feedback` — picked from the composer menu or typed and sent without text — opens the feedback dialog instead of the usage error. The dialog offers the seven categories below and a free-text box; every field is optional and an empty submission is accepted, and the conversation log travels with the recorded event as with every feedback event. It records through `sessionFeedback.record`, which appends the same `feedback/record` event without command bookkeeping and without an acknowledgement row; the dialog shows a toast instead.
+A bare `/feedback` opens the existing Session dialog. Its description is required after trimming, limited to 4000 characters, and cannot contain NUL. The dialog submits through `sessionFeedback.submit` and displays the product receipt; missing providers and failures keep the draft without reporting local-record success. The seven categories below remain the vocabulary for local records and message feedback.
+
+
+A product registers one `SessionFeedbackSubmitHandler` with `ctx.sessionFeedback.registerSubmit(handler)` inside its effect lifecycle and retains the returned disposer. The input is `{sessionId, description}`; the result is a receipt or a displayable error. The provider owns identity, fixed snapshots, transport and retry. Rebuild both Host reflection and the `api-remotes` Client assembly when the Remote changes.
 
 | Category id | Meaning |
 |---|---|

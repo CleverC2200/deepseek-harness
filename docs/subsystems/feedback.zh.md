@@ -272,6 +272,39 @@ type SessionFeedbackRecordResult =
   | { readonly ok: false; readonly error: SessionFeedbackSessionNotFound }
 ```
 
+```ts type-equiv
+/** Opaque report identity assigned by the product feedback service. */
+type SessionFeedbackReportId = Branded<'SessionFeedbackReportId'>
+```
+
+```ts type-equiv
+/** Acknowledgement of an accepted product feedback submission. */
+interface SessionFeedbackReceipt {
+  readonly reportId: SessionFeedbackReportId
+  readonly receivedAt: string
+}
+```
+
+```ts type-equiv
+/** Live Session and required description for one product feedback submission. */
+interface SessionFeedbackSubmitRequest {
+  readonly sessionId: SessionId
+  readonly description: string
+}
+```
+
+```ts type-equiv
+/** Accepted receipt or a recoverable submission failure. */
+type SessionFeedbackSubmitResult =
+  | { readonly ok: true; readonly value: SessionFeedbackReceipt }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message?: string } }
+```
+
+```ts type-equiv
+/** Product-owned submission provider; its optional failure message is safe to display. */
+type SessionFeedbackSubmitHandler = (request: SessionFeedbackSubmitRequest) => Promise<SessionFeedbackSubmitResult>
+```
+
 ## 数据与并发
 
 当前条目由 payload 中 `sessionId` 与所属 Session 匹配的权威反馈事件归约得到。每个条目携带好评或差评、可选备注、可选分类、Host 分配的 `createdAt`/`updatedAt` 时间戳及自己的 opaque version。version 只能用于相等比较，且只与目标消息比较；调用方不能排序或自行合成它。
@@ -286,7 +319,7 @@ fork 种子可以包含父 Session 的反馈事件，但 payload 保留父级 `s
 
 ## 持久化与 Remote 约定
 
-成功的消息反馈变更会等待权威持久化完成：live 操作通过所属 Session 追加，并要求有 `ctx.sessions.flush` 监听器参与；cold 操作通过写句柄追加并 flush。持久化故障会原样传播，不会报告成功。`maxNoteBytes` 为必填项，按 UTF-8 字节限制备注文本；Web Host 组合将其设为 `8192`。该包通过 `TypertRemoteService` 与 `@Remote` 发布 Host `messageFeedback.list`、`messageFeedback.put` 和 `messageFeedback.delete` 一元 Remote 约定；`command-feedback` 以同样方式发布面向 live Session 的 Session 级备注 `sessionFeedback.record`。下方生成的 Cordis API 是方法级权威。
+成功的消息反馈变更会等待权威持久化完成：live 操作通过所属 Session 追加，并要求有 `ctx.sessions.flush` 监听器参与；cold 操作通过写句柄追加并 flush。持久化故障会原样传播，不会报告成功。`maxNoteBytes` 为必填项，按 UTF-8 字节限制备注文本；Web Host 组合将其设为 `8192`。该包通过 `TypertRemoteService` 与 `@Remote` 发布 Host `messageFeedback.list`、`messageFeedback.put` 和 `messageFeedback.delete` 一元 Remote 约定；`command-feedback` 以同样方式发布面向 live Session 的 Session 级备注 `sessionFeedback.record`，以及独立的产品提交操作 `sessionFeedback.submit`。下方生成的 Cordis API 是方法级权威。
 
 插件释放会关闭操作接纳，并排空已进入各 Session 队列的工作。
 
@@ -300,7 +333,7 @@ fork 种子可以包含父 Session 的反馈事件，但 payload 保留父级 `s
 
 每个 Session 一个 `MessageFeedbackController`，支撑该 Session 内所有消息的控件：一次 `list` 读取即填充整段对话，且延迟到首次 hover 或 focus 才发起，而非挂载时触发。每次变更把该 controller 最后观察到的版本作为 `ifVersion` 发送；`version-conflict` 响应携带权威条目，controller 据此对账而不重新拉取。变更按 Session 串行，排队操作与已提交版本比较。注入的 `retract` 操作会在该队列内重新检查已提交评分，并在并发变更后变为无操作，因此陈旧 UI 无法绕过弹窗记录裸评分。`connection/reset` 只刷新已读取过的 Session。
 
-任一未记录的评分都会打开该 Session 的反馈弹窗，即 `conversation.input.overlay` 的 `feedback-dialog` 条目：共用的 Modal 卡片，里面是七个分类标签和一个详情框。提交会 put 所选评分，带上所选分类与去除首尾空白的描述，两者也可都不带；成功会关闭弹窗并显示确认 toast，失败则保留弹窗与草稿并显示警告 toast。不带文本的 `/feedback`（`ui-commands` 以 `action` 路由的一个装饰）为 Session 打开同一个弹窗，随后通过 `sessionFeedback.record` 记录；`/feedback <text>` 仍走宿主命令路径。再次点击已记录的评分会直接撤回，不打开弹窗。
+任一未记录的评分会打开该 Session 的反馈弹窗，显示七个分类标签和可选详情框；提交通过 `messageFeedback.put` 记录消息评分、分类及去除首尾空白的描述。不带文本的 `/feedback` 或 Session 菜单打开只有描述框的表单，通过 `sessionFeedback.submit` 提交；去除首尾空白后必须包含 1–4000 个字符，产品接收成功后才显示回执。失败时保留草稿，没有提供者时提示无法提交。`/feedback <text>` 保留宿主命令路径与 `feedback/record` 事件。再次点击已记录的评分会直接撤回，不打开弹窗。
 
 ## 边界与限制
 
@@ -312,7 +345,7 @@ fork 种子可以包含父 Session 的反馈事件，但 payload 保留父级 `s
 - Web 控件只出现在对话视图。trajectory 与 waterfall 视图不渲染反馈条目，尽管它们的助手节点携带相同的 `messageId`。
 - Web 控制器不消费反馈日志事件，因此另一个标签页的评分要等到重连或下一次冲突响应才可见，不会立即出现。
 - 弹窗不预先校验 `maxNoteBytes`；针对消息的超长描述在提交时以 `note-too-large` 失败，而不是在输入过程中。Session 级备注没有大小上限，`/feedback` 命令从来也没有。
-- `sessionFeedback.record` 只服务 live Session，否则回答 `session-not-found`；弹窗打开期间 Session 退役时，弹窗会报告该失败。
+- `sessionFeedback.record` 与 `sessionFeedback.submit` 都要求 live Session。产品提交不追加 `feedback/record`，也不授权既有遥测释放路径。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -361,6 +394,20 @@ Source: [`packages/feedback/message-feedback/src/index.ts`](../../packages/feedb
 Host Remote through which a product surface records a Session-level remark.
 
 ```ts cordis-catalog
+/**
+ * Install the single product submission provider.
+ * @param handler - product-owned upload operation, including authorization.
+ * @returns disposer that releases this provider only.
+ */
+registerSubmit(handler: SessionFeedbackSubmitHandler): () => void
+
+/**
+ * Submit a non-empty description through the installed product provider.
+ * @param request - live Session and a description of at most 4000 characters.
+ * @returns accepted receipt or a failure, including when no provider is installed.
+ */
+@Remote('submit') async submit(request: SessionFeedbackSubmitRequest): Promise<SessionFeedbackSubmitResult>
+
 /**
  * Record one remark on a live Session.
  * @param request - target Session plus the optional text and category.

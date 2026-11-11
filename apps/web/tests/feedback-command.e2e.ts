@@ -96,6 +96,23 @@ describe('web e2e: /feedback command acknowledgement', () => {
     expect(tripwire.warnings).toEqual([])
   }, 60_000)
 
+  it.skipIf(MODE === 'record')('keeps the product submission draft when no provider is installed', async () => {
+    const input = page.locator('[data-composer-input]').first()
+    await input.fill('/feedback')
+    await input.press('Enter')
+    const dialog = page.getByRole('dialog')
+    await dialog.waitFor()
+    await dialog.getByRole('button', { name: 'Submit', exact: true }).click()
+    await page.getByRole('alert').filter({ hasText: 'Describe the problem before submitting' }).waitFor()
+    const details = dialog.getByRole('textbox', { name: 'Feedback details' })
+    await details.fill('The reply needs review.')
+    await dialog.getByRole('button', { name: 'Submit', exact: true }).click()
+    await page.getByRole('alert').filter({ hasText: 'Feedback submission is not connected in this client' }).waitFor()
+    expect(await details.inputValue()).toBe('The reply needs review.')
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
+
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     await assertFixtureInventory(SNAPSHOT_DIR, [
       'session.v3.jsonl', 'ack.expected.md', 'ack-expanded.expected.md',

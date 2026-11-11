@@ -540,7 +540,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'feedback/record': FeedbackRecord
 ```
 
-来源：[`packages/feedback/command-feedback/src/types.ts:40`](../packages/feedback/command-feedback/src/types.ts)
+来源：[`packages/feedback/command-feedback/src/types.ts:41`](../packages/feedback/command-feedback/src/types.ts)
 
 ### `goal/*`
 
@@ -3296,7 +3296,7 @@ SHA-256: `e6063d0451dc02026fd9b54ad3f77c7b1b6392ad3e872a7737ac84e13ca72344`
 
 SHA-256: `7d54a5a5e629e2e7783bfac72683bcc5e969e9f43426b9289826aaf294ff6344`
 
-来源：[`packages/feedback/command-feedback/src/types.ts:27`](../packages/feedback/command-feedback/src/types.ts)
+来源：[`packages/feedback/command-feedback/src/types.ts:28`](../packages/feedback/command-feedback/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|

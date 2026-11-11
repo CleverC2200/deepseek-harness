@@ -8,7 +8,7 @@
 
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MessageId } from '@deepseek-ai/dsh-api-remotes/client'
-import type { FeedbackCategory, FeedbackRecord } from '@deepseek-ai/dsh-command-feedback/types'
+import type { FeedbackCategory, FeedbackRecord, SessionFeedbackReceipt } from '@deepseek-ai/dsh-command-feedback/types'
 import type { MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 import type { MessageFeedbackActionResult } from './controller.ts'
 
@@ -29,6 +29,8 @@ export interface FeedbackDialogState {
   readonly failure: string | null
   /** Sequence of the acknowledgement toast on screen; 0 while none. */
   readonly toast: number
+  readonly receipt: SessionFeedbackReceipt | null
+  readonly failureMessage: string | null
 }
 
 /**
@@ -39,7 +41,13 @@ export interface FeedbackDialogState {
 export type FeedbackSubmit = (target: FeedbackDialogTarget, entry: FeedbackRecord) => Promise<MessageFeedbackActionResult>
 
 const CLOSED: Omit<FeedbackDialogState, 'toast'> = {
-  target: null, category: null, text: '', submitting: false, failure: null,
+  target: null,
+  category: null,
+  text: '',
+  submitting: false,
+  failure: null,
+  receipt: null,
+  failureMessage: null,
 }
 
 /** Per-session dialog controller; one instance backs the overlay entry and every message control. */
@@ -61,13 +69,13 @@ export class FeedbackDialogController {
    */
   open(target: FeedbackDialogTarget): void {
     this.generation += 1
-    this.state.set({ ...CLOSED, target, toast: this.state.getSnapshot().toast })
+    this.state.set({ ...CLOSED, target, toast: this.state.getSnapshot().toast, receipt: this.state.getSnapshot().receipt })
   }
 
   /** Close the dialog and discard the draft; a toast on screen stays. */
   dismiss(): void {
     this.generation += 1
-    this.state.set({ ...CLOSED, toast: this.state.getSnapshot().toast })
+    this.state.set({ ...CLOSED, toast: this.state.getSnapshot().toast, receipt: this.state.getSnapshot().receipt })
   }
 
   /**
@@ -81,7 +89,7 @@ export class FeedbackDialogController {
   }
 
   /**
-   * Submit the draft; an empty draft is a valid submission. Success closes the
+   * Submit the draft; Session descriptions are required. Success closes the
    * dialog and raises the acknowledgement toast; a failure keeps the dialog
    * open and publishes its code for the failure toast.
    * @returns after the submission settles.
@@ -92,19 +100,40 @@ export class FeedbackDialogController {
     const generation = this.generation
     this.state.set({ ...s, submitting: true, failure: null })
     const text = s.text.trim()
-    const result = await this.submit(s.target, {
-      ...(text.length === 0 ? {} : { text }),
-      ...(s.category === null ? {} : { category: s.category }),
-    })
+    if (s.target.kind === 'session' && (text.length === 0 || text.length > 4000 || text.includes('\0'))) {
+      this.state.set({
+        ...s,
+        submitting: false,
+        failure: text.length === 0 ? 'description-blank' : 'description-invalid',
+        failureMessage: null,
+      })
+      return
+    }
+    let result: MessageFeedbackActionResult
+    try {
+      result = await this.submit(s.target, {
+        ...(text.length === 0 ? {} : { text }),
+        ...(s.category === null ? {} : { category: s.category }),
+      })
+    } catch {
+      result = { ok: false, error: { code: 'submit-failed', message: 'Feedback submission failed' } }
+    }
     if (result.ok) {
+      if (s.target.kind === 'session' && generation !== this.generation) return
       // The remark is recorded whichever draft is on screen now, so the toast
       // always shows; only the draft that produced it closes.
       if (generation === this.generation) this.dismiss()
-      this.acknowledge()
+      this.acknowledge(result.receipt)
       return
     }
     if (generation !== this.generation) return
-    this.state.set({ ...this.state.getSnapshot(), submitting: false, failure: result.error.code, toast: 0 })
+    this.state.set({
+      ...this.state.getSnapshot(),
+      submitting: false,
+      failure: result.error.code,
+      failureMessage: result.error.displayMessage ?? null,
+      toast: 0,
+    })
   }
 
   /** Clear the current failure toast without closing its draft. */
@@ -114,9 +143,9 @@ export class FeedbackDialogController {
   }
 
   /** Show the acknowledgement toast; a toast already on screen restarts. */
-  private acknowledge(): void {
+  private acknowledge(receipt?: SessionFeedbackReceipt): void {
     this.toastSeq += 1
-    this.state.set({ ...this.state.getSnapshot(), toast: this.toastSeq })
+    this.state.set({ ...this.state.getSnapshot(), toast: this.toastSeq, receipt: receipt ?? null })
   }
 
   /**
