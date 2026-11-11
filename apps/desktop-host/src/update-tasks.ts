@@ -31,7 +31,12 @@ export function installDesktopUpdateTaskControl(ctx: Context): (action: 'inspect
   let stopped = false
   ctx.effect(() => () => { stopped = true })
   const pendingRequests = new Set<Promise<void>>()
-  ctx.on('connection/request', async (_request, response, next) => {
+  ctx.on('connection/request', async (request, response, next) => {
+    if (new URL(request.url ?? '/', 'http://desktop.internal').pathname === '/api/desktop/update') {
+      response.writeHead(403)
+      response.end()
+      return
+    }
     if (locked) {
       response.writeHead(503)
       response.end()

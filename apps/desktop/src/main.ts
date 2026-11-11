@@ -28,10 +28,11 @@ import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-vi
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
 import { installMicrophonePermissions } from './microphone-permissions.ts'
 import { DesktopBackendController } from './backend-controller.ts'
-import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
+import { DESKTOP_IPC, SCHEME, assertDesktopSender, desktopUpdating, setDesktopUpdating, type DesktopUpdateState } from './ipc.ts'
 import { readDeviceInfo } from './device-info.ts'
 import { desktopUpdateReadyConfirmation, formatDesktopMessage, resolveDesktopLocale, resolveDesktopStartupLocale } from './locale.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
+import { DesktopRestartUpdate } from './restart-update.ts'
 import { DesktopUpdateCoordinator } from './update-coordinator.ts'
 import { DesktopCommandManager } from './command-management.ts'
 import { serveWebDocument, authenticateWebHost, forwardWebRequest } from './web-document.ts'
@@ -203,6 +204,7 @@ function platformLoginUrl(authorizeUrl: string): string {
 }
 
 function createWindow(preload: string, show = false, primary = false): BrowserWindow {
+  if (desktopUpdating()) throw new Error('desktop update: client is updating')
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -236,6 +238,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     },
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (desktopUpdating()) return { action: 'deny' }
     if (['http:', 'https:'].includes(new URL(url).protocol)) void shell.openExternal(url)
     return { action: 'deny' }
   })
@@ -367,6 +370,16 @@ async function main(): Promise<void> {
   const currentDialogWindow = (): BrowserWindow | undefined => welcomeWindow ?? mainWindow
   const updateOverlays = new DesktopUpdateOverlays()
   const updateDialog = new DesktopUpdateDialog(fileURLToPath(new URL('./preload-update-dialog.cjs', import.meta.url)), () => locale, updateOverlays)
+  const takeoverWindows = new Map<BrowserWindow, boolean>()
+  app.on('browser-window-created', (_event, window) => {
+    if (desktopUpdating()) { takeoverWindows.set(window, window.isEnabled()); window.setEnabled(false) }
+  })
+  app.on('web-contents-created', (_event, contents) => {
+    contents.prependListener('before-input-event', (event) => {
+      if (desktopUpdating() && !updateDialog.ownsContents(contents)) { event.preventDefault(); updateDialog.focus() }
+    })
+    contents.on('will-attach-webview', (event) => { if (desktopUpdating()) event.preventDefault() })
+  })
   const isMandatory = (): boolean => mandatoryPolicy?.state.blocking === true
   const ordinaryMessageBox = async (options: UpdateDialogOptions): Promise<Electron.MessageBoxReturnValue> => {
     const controller = new AbortController()
@@ -414,8 +427,8 @@ async function main(): Promise<void> {
   let returnedAttempt: string | undefined
   let pendingWelcomeNotice: WelcomeNotice | undefined
   let previousAccountStatus: string | undefined
-  const assertProductSender = (event: IpcMainInvokeEvent): void => {
-    assertDesktopSender(event, ['app'])
+  const assertProductSender = (event: IpcMainInvokeEvent, allowWhileUpdating = false): void => {
+    assertDesktopSender(event, ['app'], allowWhileUpdating)
     if (mainWindow === undefined || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents
       || event.senderFrame === null || event.senderFrame !== mainWindow.webContents.mainFrame) {
       throw new Error('dsh desktop: rejected IPC from an unowned renderer')
@@ -458,7 +471,7 @@ async function main(): Promise<void> {
         stopAccount?.()
         const accountBackend = welcomeBackend.account
         stopAccount = accountBackend.watch((state) => {
-          if (quitting) return
+          if (quitting || desktopUpdating()) return
           if (welcomeWindow !== undefined && !welcomeWindow.isDestroyed()) welcomeWindow.webContents.send(WELCOME_IPC.state, state)
           const attempt = state.attempt
           if (attempt?.phase === 'waiting-browser' && attempt.authorizeUrl !== undefined && openedAttempt !== attempt.id) {
@@ -504,17 +517,19 @@ async function main(): Promise<void> {
           updateStopFailure = error
         }
       },
+      updateOperation: (request: Parameters<DesktopHostProcess['updateOperation']>[0]) => host.updateOperation(request),
       updateTasks: (action: 'inspect' | 'lock' | 'unlock') => host.updateTasks(action),
       inspectQuit: () => host.inspectQuit(),
     }
   }, (state) => {
-    if (state.phase === 'error') reportFatal(state.failure, 'host')
+    if (state.phase === 'error' && desktopUpdating()) restartTakeover.failed()
+    else if (state.phase === 'error') reportFatal(state.failure, 'host')
     else if (!shuttingDown) backendReady = state.phase === 'ready'
   })
 
   const updateErrors = new WeakMap<DesktopUpdateState, Promise<void>>()
   const showUpdateFailure = (state: DesktopUpdateState): Promise<void> => {
-    if (state.phase !== 'error') return Promise.resolve()
+    if (state.phase !== 'error' || desktopUpdating()) return Promise.resolve()
     if (isMandatory()) { mandatoryUI?.sync(); return Promise.resolve() }
     let shown = updateErrors.get(state)
     if (shown === undefined) {
@@ -528,6 +543,7 @@ async function main(): Promise<void> {
   const publishUpdate = (state: DesktopUpdateState): DesktopUpdateState => {
     updateJournal?.state(state)
     updateState = state
+    if (desktopUpdating() && (state.phase === 'downloading' || state.phase === 'verifying')) showTakeoverProgress('desktop')
     mandatoryUI?.sync()
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(DESKTOP_IPC.updatesPresentation, presentDesktopUpdate(state))
@@ -553,6 +569,7 @@ async function main(): Promise<void> {
           if (workspaceRecovery === recovery) workspaceRecovery = undefined
         })
       }
+      if (desktopUpdating()) restartTakeover.failed()
       void showUpdateFailure(state).catch((error: unknown) => { console.error(error) })
     }
     return state
@@ -589,7 +606,7 @@ async function main(): Promise<void> {
       await startup?.catch(() => undefined)
       const host = backend.host
       if (host === undefined) throw new DesktopUpdatePreparationError('tasks-unavailable', locale.messages.updateTasksUnavailable)
-      const active = await host.updateTasks('inspect')
+      const active = desktopUpdating() ? true : await host.updateTasks('inspect')
       const ready = desktopUpdateReadyConfirmation(locale.messages, updates.state.version ?? '', process.platform)
       const confirmation: Electron.MessageBoxOptions = {
         type: active ? 'warning' : 'info', title: locale.messages.updateTitle,
@@ -598,7 +615,9 @@ async function main(): Promise<void> {
         buttons: active ? [locale.messages.updateStopTasks, locale.messages.updateLater] : [locale.messages.installAndRestart],
         defaultId: 1, cancelId: 1,
       }
-      if (isMandatory()) {
+      if (desktopUpdating()) {
+        showTakeoverProgress('restarting')
+      } else if (isMandatory()) {
         if (!await mandatoryUI?.confirm(updates.state.version ?? '', active)) return false
       } else {
         const parent = currentDialogWindow()
@@ -625,7 +644,7 @@ async function main(): Promise<void> {
         updateJournal?.action('install-confirmed')
         shellInstallerOwnsQuit = true
       } catch (error) {
-        if (!updateStoppedHost) await host.updateTasks('unlock').catch((unlockError: unknown) => { console.error(unlockError) })
+        if (!desktopUpdating() && !updateStoppedHost) await host.updateTasks('unlock').catch((unlockError: unknown) => { console.error(unlockError) })
         throw error
       } finally {
         requireCleanStop = false
@@ -636,6 +655,76 @@ async function main(): Promise<void> {
     (success, reason) => { void track('desktop_upgrade_download_result', { is_success: success, ...reason === undefined ? {} : { error_reason: reason } }) },
 
   )
+
+  let takeoverView = ''
+  const showTakeoverProgress = (phase: 'preparing' | 'plugins' | 'desktop' | 'restarting' | 'unknown' | 'failed'): void => {
+    const parent = mainWindow
+    if (parent === undefined || parent.isDestroyed()) return
+    const message = phase === 'preparing' ? locale.messages.takeoverPreparing
+      : phase === 'plugins' ? locale.messages.takeoverPlugins
+        : phase === 'desktop' ? updateState.phase === 'downloading' && updateState.percent !== undefined
+          ? formatDesktopMessage(locale.messages.updateDownloading, { percent: String(Math.floor(updateState.percent)) })
+          : updateState.phase === 'verifying' ? locale.messages.updateVerifying : locale.messages.takeoverDesktop
+          : phase === 'restarting' ? locale.messages.takeoverRestarting
+            : phase === 'unknown' ? locale.messages.takeoverUnknown : locale.messages.takeoverFailed
+    if (takeoverView === message && updateDialog.isOpen) return
+    takeoverView = message
+    void updateDialog.show(parent, { type: phase === 'unknown' || phase === 'failed' ? 'error' : 'info',
+      title: locale.messages.updateTitle, message,
+      detail: phase === 'unknown' ? locale.messages.takeoverUnknownDetail : locale.messages.updateDownloadedDetail,
+      blocking: phase !== 'failed', buttons: phase === 'unknown' ? [locale.messages.takeoverCheck]
+        : phase === 'failed' ? [locale.messages.updateAcknowledge] : [], cancelId: 1,
+    }).then(async (result) => {
+      if (phase === 'unknown' && result.response === 0 && restartTakeover.active) {
+        takeoverView = ''
+        showTakeoverProgress('unknown')
+        await restartTakeover.recover()
+      }
+    }).catch((error: unknown) => { console.error(error) })
+  }
+  const restartTakeover: DesktopRestartUpdate = new DesktopRestartUpdate({
+    host: () => backend.host, state: () => updates.state,
+    download: version => updates.download(version), install: version => updates.install(version),
+    block: (active) => {
+      setDesktopUpdating(active)
+      if (active) {
+        for (const controller of ordinaryDialogs) controller.abort()
+        platformView.close()
+      }
+      if (active) {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!updateDialog.ownsContents(window.webContents)) { takeoverWindows.set(window, window.isEnabled()); window.setEnabled(false) }
+        }
+      } else {
+        for (const [window, enabled] of takeoverWindows) if (!window.isDestroyed()) window.setEnabled(enabled)
+        takeoverWindows.clear()
+      }
+      refreshApplicationMenu()
+      if (active) showTakeoverProgress('preparing')
+    },
+    progress: showTakeoverProgress,
+    stop: async () => {
+      await platformView.closeAndWait()
+      requireCleanStop = true
+      updateStopFailure = undefined
+      try {
+        await backend.stop()
+        updateStoppedHost = true
+        const failure = updateStopFailure as DesktopHostUncleanExitError | undefined
+        if (failure !== undefined) {
+          publishUpdate({ phase: 'error', failedOperation: 'install', preparationFailure: 'stop-failed' })
+          throw failure
+        }
+      } finally { requireCleanStop = false }
+    },
+    relaunch: async () => { app.relaunch(); finishQuit() },
+    wait: () => new Promise((resolve) => { setTimeout(resolve, 1_000) }),
+  })
+  ipcMain.handle(DESKTOP_IPC.updatesRestart, (event, request: unknown) => {
+    assertProductSender(event, true)
+    if (!restartTakeover.active && (quitting || shuttingDown || shellInstallerOwnsQuit)) throw new Error('desktop update: client is stopping')
+    return restartTakeover.start(request)
+  })
 
   const updateSchedule = new DesktopUpdateSchedule(updates, resolveDesktopUpdateScheduleConfig(process.env))
 
@@ -679,7 +768,7 @@ async function main(): Promise<void> {
   installDesktopDirectoryPicker(() => mainWindow)
   installMicrophonePermissions(session.defaultSession, () => mainWindow?.webContents)
   const shortcuts = installDesktopShortcuts(() => mainWindow, app.getPath('userData'),
-    process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : 'linux', () => { refreshApplicationMenu() }, window => updateOverlays.input(window))
+    process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : 'linux', () => { refreshApplicationMenu() }, window => desktopUpdating() ? { revision: -1, blocked: true } : updateOverlays.input(window))
   app.on('will-quit', () => { shortcuts.dispose() })
 
   ipcMain.handle(DESKTOP_IPC.boot, async (event) => {
@@ -695,6 +784,7 @@ async function main(): Promise<void> {
       throw new Error('dsh desktop: rejected startup failure from a non-primary frame')
     }
     if (typeof message !== 'string') throw new Error('dsh desktop: startup failure must be text')
+    if (desktopUpdating()) { restartTakeover.failed(); return }
     reportFatal(new Error(message), 'web-boot')
   })
 
@@ -721,6 +811,7 @@ async function main(): Promise<void> {
   })
 
   const assertMainApplication = (event: IpcMainInvokeEvent): BrowserWindow => {
+    if (desktopUpdating()) throw new Error('desktop update: client is updating')
     const owner = mainWindow
     if (owner === undefined || event.sender !== owner.webContents || event.senderFrame !== owner.webContents.mainFrame
       || !event.senderFrame.url.startsWith('dsh-app://app/')) throw new Error('Rejected Platform command')
@@ -742,6 +833,7 @@ async function main(): Promise<void> {
   ipcMain.handle(PLATFORM_IPC.close, (event) => { assertMainApplication(event); platformView.close() })
   // Only the main window may synchronize its palette with the native material.
   ipcMain.on(DESKTOP_IPC.nativeThemeSet, (event, source: unknown) => {
+    if (desktopUpdating()) return
     if (mainWindow === undefined || event.sender !== mainWindow.webContents) return
     if (source === 'light' || source === 'dark' || source === 'system') nativeTheme.themeSource = source
   })
@@ -754,6 +846,7 @@ async function main(): Promise<void> {
     return { languages: systemLanguages, preference: await welcomeBackend.readLocalePreference() }
   })
   ipcMain.on(DESKTOP_IPC.localeChanged, (event, next: unknown) => {
+    if (desktopUpdating()) return
     const window = mainWindow
     if (window === undefined || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame
       || typeof next !== 'string') return
@@ -922,6 +1015,7 @@ async function main(): Promise<void> {
   }
 
   const automaticCheck = (): void => {
+    if (desktopUpdating()) return
     if (!quitting) void mandatoryPolicy?.check('foreground-or-resume').catch((error: unknown) => { console.error(error) })
     if (!quitting) void updateSchedule.check().catch((error: unknown) => { console.error(error) })
   }
@@ -984,6 +1078,7 @@ async function main(): Promise<void> {
     { role: 'toggleDevTools', visible: false, accelerator: 'F12' },
   ]
   const refreshApplicationMenu = (): void => {
+    if (desktopUpdating()) { Menu.setApplicationMenu(Menu.buildFromTemplate([])); return }
     Menu.setApplicationMenu(Menu.buildFromTemplate(process.platform === 'win32' ? devToolsItems : [{
       label: darwin ? app.name : currentDesktopLocale().messages.application,
       submenu: [...applicationItems(), ...devToolsItems],
@@ -1106,15 +1201,17 @@ async function main(): Promise<void> {
     })
     window.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
       if (isMainFrame && code !== -3 && !quitting && !window.isDestroyed()) {
+        if (desktopUpdating()) return
         reportFatal(new Error(`Desktop page failed to load: ${url} (${String(code)}: ${description})`), 'renderer')
       }
     })
     window.webContents.on('preload-error', (_event, _path, error) => {
-      if (!quitting && !window.isDestroyed()) reportFatal(error, 'renderer')
+      if (!quitting && !window.isDestroyed() && !desktopUpdating()) reportFatal(error, 'renderer')
     })
     window.webContents.on('render-process-gone', (_event, details) => {
       navigation = undefined
       if (!quitting && !window.isDestroyed() && details.reason !== 'clean-exit') {
+        if (desktopUpdating()) return
         reportFatal(new Error(`Desktop renderer exited: ${details.reason}`), 'renderer')
       }
     })
@@ -1205,7 +1302,7 @@ async function main(): Promise<void> {
     return openingWelcome
   }
   const openInitialWindow = async (): Promise<void> => {
-    if (quitting || recovery.active) return
+    if (quitting || recovery.active || desktopUpdating()) return
     const state = await readWelcomeState()
     if (isQuitting() || backend.state.phase !== 'ready') return
     locale = resolveDesktopStartupLocale(state.localePreference, systemLanguages)
@@ -1220,6 +1317,7 @@ async function main(): Promise<void> {
     }
   }
   focusPrimaryWindow = () => {
+    if (desktopUpdating()) { updateDialog.focus(); return }
     if (quitting) return
     if (isMandatory()) { mandatoryUI?.focus(); return }
     const window = welcomeWindow ?? mainWindow
@@ -1293,6 +1391,7 @@ async function main(): Promise<void> {
     }
     if (quitting) return
     event.preventDefault()
+    if (desktopUpdating()) { updateDialog.focus(); return }
     if (skipQuitConfirmation || sessionEnding) { finishQuit(); return }
     void quitConfirmation.confirm().then((approved) => {
       if (quitting || shellInstallerOwnsQuit) return
@@ -1322,6 +1421,7 @@ async function main(): Promise<void> {
       platform: process.platform as 'win32' | 'darwin', arch: process.arch as 'x64' | 'arm64',
       bundledDshVersion: app.isPackaged ? readDesktopRuntime(resources.dsh).release.version : app.getVersion(),
     }, (state) => {
+      if (desktopUpdating()) return
       if (state.error !== 'authentication-required') policyAuthenticationQueued = false
       if (state.blocking) {
         for (const controller of ordinaryDialogs) controller.abort()

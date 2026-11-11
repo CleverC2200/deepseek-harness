@@ -15,6 +15,7 @@ export interface UpdateDialogView {
   readonly message: string
   readonly detail: string
   readonly buttons: readonly string[]
+  readonly dismissible: boolean
   readonly cancelId: number
   readonly closeLabel: string
   readonly technicalDetails: string
@@ -23,6 +24,7 @@ export interface UpdateDialogView {
 
 /** Electron message options with separately expandable, main-owned diagnostics. */
 export interface UpdateDialogOptions extends MessageBoxOptions {
+  readonly blocking?: boolean
   readonly technicalDetails?: string
 }
 
@@ -45,6 +47,8 @@ export class DesktopUpdateDialog {
   private closing: ReturnType<typeof setTimeout> | undefined
   private active: { window: BrowserWindow; view: UpdateDialogView; finish: (index: number, retain?: boolean) => void } | undefined
 
+  ownsContents(contents: Electron.WebContents): boolean { return this.window?.webContents === contents }
+
   /** Focus the current explanation or confirmation without replacing it or granting permission. */
   focus(): void { this.active?.window.focus() }
 
@@ -63,6 +67,7 @@ export class DesktopUpdateDialog {
       this.owned(event)
       const active = this.active
       if (active === undefined || revision !== active.view.revision) throw new Error('desktop update: stale dialog response')
+      if (!active.view.dismissible && (typeof index !== 'number' || index < 0 || index >= active.view.buttons.length)) throw new Error('desktop update: blocking progress has no response')
       if (typeof index !== 'number' || !Number.isInteger(index)
         || (index !== active.view.cancelId && (index < 0 || index >= active.view.buttons.length))) {
         throw new Error('desktop update: invalid dialog response')
@@ -90,9 +95,10 @@ export class DesktopUpdateDialog {
     const existing = this.window
     const window = existing ?? this.overlays.create(parent, this.preload, options.title ?? locale.messages.updateTitle, false)
     this.window = window
+    if (options.blocking === true) window.setEnabled(true)
     this.parent = parent
     const view: UpdateDialogView = { revision: ++this.revision, locale: locale.id, title: options.title ?? '', message: options.message,
-      detail: options.detail ?? '', buttons, cancelId, closeLabel: locale.messages.updateClose,
+      detail: options.detail ?? '', buttons, dismissible: options.blocking !== true, cancelId, closeLabel: locale.messages.updateClose,
       technicalDetails: options.technicalDetails ?? '', technicalDetailsLabel: locale.messages.updateTechnicalDetails }
     return new Promise((resolve) => {
       const abort = (): void => { finish(cancelId) }
@@ -110,6 +116,7 @@ export class DesktopUpdateDialog {
       options.signal?.addEventListener('abort', abort, { once: true })
       if (existing !== undefined) { window.webContents.send(UPDATE_DIALOG_IPC.changed, view); return }
       const failed = (): void => { if (this.window === window) { this.cancel(); this.close() } }
+      window.on('close', (event) => { if (this.active?.window === window && !this.active.view.dismissible) event.preventDefault() })
       window.once('closed', failed)
       window.webContents.on('will-navigate', (event, url) => { if (url !== page) event.preventDefault() })
       window.webContents.once('render-process-gone', failed)

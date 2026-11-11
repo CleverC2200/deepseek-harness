@@ -418,6 +418,8 @@ Windows 下载完成后的更新确认说明应用会在安装期间关闭、完
 
 已确认 Host 退出但任务未成功收尾时，常规与强更弹窗均展示本地化恢复提示。两种语言都根据类型化的准备失败原因选择提示，翻译文案变化不会改变失败分类。“查看技术详情”默认折叠，仅展示退出状态、信号、关闭确认和截止时间事实，不展示插件 stderr。展开详情既不重试，也不授权安装。
 
+协议 1 可选桥 `dshDesktop.updates.restartUpdate` 接受已检查的客户端版本、已批准的插件计划或已有待重启插件操作。点击一次即授权结束任务并重启。主进程在页面刷新或退出后继续持有操作，禁用普通窗口、菜单、快捷键和 IPC，锁住 Host HTTP 请求，并沿私有子进程 IPC，通过官方 Fetch registry 调用固定 `/api/desktop/update` 适配器。普通 HTTP 无法调用该适配器。插件路径等到对应操作可重启且 Host 干净退出后才重启，客户端安装仍使用 electron-updater。无适配器时普通客户端更新可以继续，公司适配器准备失败不能按缺失跳过。写者状态不明时保持阻断并显示原生“重新检查”入口，只有确认写入结束的失败才恢复普通操作。旧客户端须先检测该加法能力。
+
 ### 强制更新策略
 
 [强更客户端决策](../../.agents/notes/implemented/feature/2026-09-11-desktop-mandatory-update-client.zh.md)负责策略查询和阻塞窗口。打包读取 `.env.windows` 或 `.env.macos`：`DSH_DESKTOP_AUTO_UPDATE_ENV=test`（默认值）选择 `DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN`；`production` 选择 `DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN`。模板将两个源站留空；在 Git 忽略的目标 dotenv 文件中填写所选部署的源站。在准备产物或签名前，所选源站必须配置，包括未签名和仅准备构建；未选环境的源站可不填。这些配置不会回退到父进程环境或另一部署环境。打包将选定策略与应用 ID 写入元数据；打包应用忽略运行时覆盖。
