@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-11-session-feedback-submit.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-11-session-feedback-submit.md
+/agent-note-product-session-feedback-submission:
+  en: 5f7e171001b71727
+  zh: 4cbdc467638a9f0e
+/agent-note-product-session-feedback-submission/problem:
+  en: e4dd3792437b527b
+  zh: 8fbb5437d2fa5385
+/agent-note-product-session-feedback-submission/decision:
+  en: de8101cecad494ed
+  zh: 08da0c43ee6b87e6
+/agent-note-product-session-feedback-submission/alternatives-considered:
+  en: 63ef101b30ef5bc9
+  zh: 7b2d67e26357aae3
+/agent-note-product-session-feedback-submission/consequences:
+  en: d51d90d671a992fd
+  zh: 31df1e171ac9726a
+/agent-note-product-session-feedback-submission/verification-and-retirement:
+  en: 771bb8d71fa76c17
+  zh: b8c62b8fbbb15a7a

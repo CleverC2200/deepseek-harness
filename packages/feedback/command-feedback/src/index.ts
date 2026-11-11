@@ -19,6 +19,9 @@ import type {
   FeedbackRecord,
   SessionFeedbackRecordRequest,
   SessionFeedbackRecordResult,
+  SessionFeedbackSubmitRequest,
+  SessionFeedbackSubmitResult,
+  SessionFeedbackSubmitHandler,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -85,11 +88,47 @@ function executeFeedbackCommand(invocation: CommandInvocation): CommandResult {
 export class SessionFeedbackService extends TypertRemoteService {
   static inject = ['sessions']
 
+  private submitProvider: { handler: SessionFeedbackSubmitHandler } | undefined
+
   /**
    * @param ctx - Host context carrying the live Session store.
    */
   constructor(ctx: Context) {
     super(ctx, 'sessionFeedback')
+  }
+
+  /**
+   * Install the single product submission provider.
+   * @param handler - product-owned upload operation, including authorization.
+   * @returns disposer that releases this provider only.
+   */
+  registerSubmit(handler: SessionFeedbackSubmitHandler): () => void {
+    if (this.submitProvider !== undefined) throw new Error('feedback submit handler already registered')
+    const provider = { handler }
+    this.submitProvider = provider
+    return () => {
+      if (this.submitProvider === provider) this.submitProvider = undefined
+    }
+  }
+
+  /**
+   * Submit a non-empty description through the installed product provider.
+   * @param request - live Session and a description of at most 4000 characters.
+   * @returns accepted receipt or a failure, including when no provider is installed.
+   */
+  @Remote('submit')
+  async submit(request: SessionFeedbackSubmitRequest): Promise<SessionFeedbackSubmitResult> {
+    if (this.ctx.sessions.get(request.sessionId) === undefined) return { ok: false, error: { code: 'session-not-found' } }
+    const description = typeof request.description === 'string' ? request.description.trim() : ''
+    if (description.length === 0) return { ok: false, error: { code: 'description-blank' } }
+    if (description.length > 4000 || description.includes('\0')) return { ok: false, error: { code: 'description-invalid' } }
+    const handler = this.submitProvider?.handler
+    if (handler === undefined) return { ok: false, error: { code: 'submit-unavailable' } }
+    try {
+      return await handler({ sessionId: request.sessionId, description })
+    } catch {
+      return { ok: false, error: { code: 'submit-failed' } }
+    }
   }
 
   /**

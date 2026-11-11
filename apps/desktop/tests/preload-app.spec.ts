@@ -44,7 +44,9 @@ it('exposes a check-only action without renderer installation authority', async 
   await api.updates.check()
   await api.updates.status()
   await api.updates.open()
-  expect(electron.ipcRenderer.invoke.mock.calls).toEqual([[DESKTOP_IPC.updatesCheck], [DESKTOP_IPC.updatesStatus], [DESKTOP_IPC.updatesOpen, undefined]])
+  expect(electron.ipcRenderer.invoke.mock.calls).toEqual([
+    [DESKTOP_IPC.updatesCheck], [DESKTOP_IPC.updatesStatus], [DESKTOP_IPC.updatesOpen, undefined],
+  ])
   expect(api).not.toHaveProperty('plugins')
   expect(api).not.toHaveProperty('backend')
   expect(api.updates).not.toHaveProperty('install')
@@ -97,7 +99,7 @@ it('reads the installed release through a parameterless native API', async () =>
   if (typeof api !== 'object' || api === null || !('appVersion' in api) || typeof api.appVersion !== 'function') {
     throw new Error('missing appVersion bridge')
   }
-  await expect(api.appVersion()).resolves.toBe('0.2.0-rc.2.20261103.1')
+  await expect(Reflect.apply(api.appVersion, api, [])).resolves.toBe('0.2.0-rc.2.20261103.1')
   expect(electron.ipcRenderer.invoke).toHaveBeenCalledExactlyOnceWith(DESKTOP_IPC.appVersion)
 })
 
@@ -109,7 +111,7 @@ it.each(['', '   ', null, 20261103])('rejects an invalid native version response
   if (typeof api !== 'object' || api === null || !('appVersion' in api) || typeof api.appVersion !== 'function') {
     throw new Error('missing appVersion bridge')
   }
-  await expect(api.appVersion()).rejects.toThrow('invalid application version')
+  await expect(Reflect.apply(api.appVersion, api, [])).rejects.toThrow('invalid application version')
 })
 
 it('preserves native version read failures without returning a build version', async () => {
@@ -120,7 +122,7 @@ it('preserves native version read failures without returning a build version', a
   if (typeof api !== 'object' || api === null || !('appVersion' in api) || typeof api.appVersion !== 'function') {
     throw new Error('missing appVersion bridge')
   }
-  await expect(api.appVersion()).rejects.toThrow('native read failed')
+  await expect(Reflect.apply(api.appVersion, api, [])).rejects.toThrow('native read failed')
 })
 
 it('exposes asynchronous boot only to the local application document', async () => {

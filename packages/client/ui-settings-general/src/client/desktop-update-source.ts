@@ -16,6 +16,10 @@ export class DesktopUpdateSource {
     this.setEnabled(true)
   }
 
+  /**
+   * Start or stop observing native updates while retaining an in-flight dialog.
+   * @param enabled - whether the sidebar can display the native update control.
+   */
   setEnabled(enabled: boolean): void {
     if (!this.live || this.enabled === enabled) return
     this.enabled = enabled

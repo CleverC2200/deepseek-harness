@@ -8,6 +8,7 @@
  */
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { Branded } from '@deepseek-ai/dsh-brand'
 
 /** One of the fixed feedback categories; the ids are durable log vocabulary. */
 export type FeedbackCategory =
@@ -67,3 +68,26 @@ export interface SessionFeedbackSessionNotFound {
 export type SessionFeedbackRecordResult =
   | { readonly ok: true; readonly value: SessionFeedbackRecordValue }
   | { readonly ok: false; readonly error: SessionFeedbackSessionNotFound }
+
+/** Opaque report identity assigned by the product feedback service. */
+export type SessionFeedbackReportId = Branded<'SessionFeedbackReportId'>
+
+/** Acknowledgement of an accepted product feedback submission. */
+export interface SessionFeedbackReceipt {
+  readonly reportId: SessionFeedbackReportId
+  readonly receivedAt: string
+}
+
+/** Live Session and required description for one product feedback submission. */
+export interface SessionFeedbackSubmitRequest {
+  readonly sessionId: SessionId
+  readonly description: string
+}
+
+/** Accepted receipt or a recoverable submission failure. */
+export type SessionFeedbackSubmitResult =
+  | { readonly ok: true; readonly value: SessionFeedbackReceipt }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message?: string } }
+
+/** Product-owned submission provider; its optional failure message is safe to display. */
+export type SessionFeedbackSubmitHandler = (request: SessionFeedbackSubmitRequest) => Promise<SessionFeedbackSubmitResult>

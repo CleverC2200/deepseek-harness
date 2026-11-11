@@ -84,7 +84,7 @@ export function apply(ctx: ClientContext): void {
         || !('protocolVersion' in versionCarrier) || versionCarrier.protocolVersion !== 1
         || !('appVersion' in versionCarrier) || typeof versionCarrier.appVersion !== 'function') return
       try {
-        const installedVersion: unknown = await versionCarrier.appVersion()
+        const installedVersion: unknown = await Reflect.apply(versionCarrier.appVersion, versionCarrier, [])
         if (active && typeof installedVersion === 'string' && installedVersion.trim() !== '') version.set(installedVersion)
       } catch {
         if (active) version.set(undefined)

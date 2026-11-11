@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-command-feedback",
-  "description": "Log-only session feedback: the record event, the sessionFeedback Host Remote, and the human-facing slash command",
+  "description": "Session feedback records, product submission provider and receipt Remote",
   "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
@@ -48,7 +48,8 @@
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-anonymous-user-id": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:*"
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "@deepseek-ai/dsh-brand": "workspace:*"
   },
   "dependencies": {
     "zod": "^4.4.3"
@@ -63,6 +64,7 @@
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-anonymous-user-id": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:*"
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "@deepseek-ai/dsh-brand": "workspace:*"
   }
 }

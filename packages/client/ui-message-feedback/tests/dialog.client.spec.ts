@@ -22,7 +22,14 @@ describe('FeedbackDialogController', () => {
     const { controller } = bench()
 
     expect(controller.state.getSnapshot()).toEqual({
-      target: null, category: null, text: '', submitting: false, failure: null, toast: 0,
+      target: null,
+      category: null,
+      text: '',
+      submitting: false,
+      failure: null,
+      toast: 0,
+      receipt: null,
+      failureMessage: null,
     })
   })
 
@@ -33,13 +40,17 @@ describe('FeedbackDialogController', () => {
     controller.edit({ category: 'task-result' })
     controller.edit({ text: 'slow' })
     expect(controller.state.getSnapshot()).toMatchObject({
-      target: { kind: 'session' }, category: 'task-result', text: 'slow',
+      target: { kind: 'session' },
+      category: 'task-result',
+      text: 'slow',
     })
 
     controller.dismiss()
     controller.open(MESSAGE_TARGET)
     expect(controller.state.getSnapshot()).toMatchObject({
-      target: MESSAGE_TARGET, category: null, text: '',
+      target: MESSAGE_TARGET,
+      category: null,
+      text: '',
     })
   })
 
@@ -66,14 +77,15 @@ describe('FeedbackDialogController', () => {
     expect(controller.state.getSnapshot()).toMatchObject({ target: null, toast: 1 })
   })
 
-  it('submits an empty draft as an entry with neither text nor category', async () => {
+  it('rejects a blank session description without calling the provider', async () => {
     const { controller, submit } = bench()
     controller.open({ kind: 'session' })
     controller.edit({ text: '   ' })
 
     await controller.submitDraft()
 
-    expect(submit).toHaveBeenCalledWith({ kind: 'session' }, {})
+    expect(submit).not.toHaveBeenCalled()
+    expect(controller.state.getSnapshot().failure).toBe('description-blank')
   })
 
   it('submits the message target with the entry', async () => {
@@ -96,9 +108,25 @@ describe('FeedbackDialogController', () => {
     await controller.submitDraft()
 
     expect(controller.state.getSnapshot()).toMatchObject({
-      target: MESSAGE_TARGET, text: 'draft', submitting: false,
-      failure: 'version-conflict', toast: 0,
+      target: MESSAGE_TARGET,
+      text: 'draft',
+      submitting: false,
+      failure: 'version-conflict',
+      toast: 0,
     })
+  })
+
+  it('keeps unexpected failures locale-owned and retains provider display messages', async () => {
+    const generic = bench(() => Promise.reject(new Error('internal transport details'))).controller
+    generic.open({ kind: 'session' })
+    generic.edit({ text: 'draft' })
+    await generic.submitDraft()
+    expect(generic.state.getSnapshot()).toMatchObject({ failure: 'submit-failed', failureMessage: null, text: 'draft' })
+    const product = bench(() => Promise.resolve({ ok: false, error: { code: 'upload-failed', message: 'private', displayMessage: '请重新登录' } })).controller
+    product.open({ kind: 'session' })
+    product.edit({ text: 'draft' })
+    await product.submitDraft()
+    expect(product.state.getSnapshot().failureMessage).toBe('请重新登录')
   })
 
   it('retires the failure toast without closing its draft', async () => {
@@ -113,7 +141,11 @@ describe('FeedbackDialogController', () => {
 
   it('freezes the draft and refuses a second submit while one is in flight', async () => {
     let release = (): void => {}
-    const gate = new Promise<MessageFeedbackActionResult>((resolve) => { release = () => { resolve({ ok: true }) } })
+    const gate = new Promise<MessageFeedbackActionResult>((resolve) => {
+      release = () => {
+        resolve({ ok: true })
+      }
+    })
     const { controller, submit } = bench(() => gate)
     controller.open({ kind: 'session' })
     controller.edit({ text: 'first' })
@@ -132,9 +164,13 @@ describe('FeedbackDialogController', () => {
 
   it('acknowledges a success that lands after a reopen without closing the new draft', async () => {
     let release = (): void => {}
-    const gate = new Promise<MessageFeedbackActionResult>((resolve) => { release = () => { resolve({ ok: true }) } })
+    const gate = new Promise<MessageFeedbackActionResult>((resolve) => {
+      release = () => {
+        resolve({ ok: true })
+      }
+    })
     const { controller } = bench(() => gate)
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
     const pending = controller.submitDraft()
     controller.open(MESSAGE_TARGET)
     controller.edit({ text: 'new draft' })
@@ -143,17 +179,21 @@ describe('FeedbackDialogController', () => {
     await pending
 
     expect(controller.state.getSnapshot()).toMatchObject({
-      target: MESSAGE_TARGET, text: 'new draft', toast: 1,
+      target: MESSAGE_TARGET,
+      text: 'new draft',
+      toast: 1,
     })
   })
 
   it('drops a failure that lands after the draft was dismissed', async () => {
     let release = (): void => {}
     const gate = new Promise<MessageFeedbackActionResult>((resolve) => {
-      release = () => { resolve({ ok: false, error: { code: 'gateway/internal', message: 'boom' } }) }
+      release = () => {
+        resolve({ ok: false, error: { code: 'gateway/internal', message: 'boom' } })
+      }
     })
     const { controller } = bench(() => gate)
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
     const pending = controller.submitDraft()
     controller.dismiss()
 
@@ -166,9 +206,9 @@ describe('FeedbackDialogController', () => {
   it('retires only the toast the view finished showing', async () => {
     const { controller } = bench()
 
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
     await controller.submitDraft()
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
     await controller.submitDraft()
     expect(controller.state.getSnapshot().toast).toBe(2)
 
@@ -180,17 +220,34 @@ describe('FeedbackDialogController', () => {
 
   it('keeps a toast on screen across a dismiss and drops everything on dispose', async () => {
     const { controller } = bench()
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
     await controller.submitDraft()
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
 
     controller.dismiss()
     expect(controller.state.getSnapshot()).toMatchObject({ target: null, toast: 1 })
 
-    controller.open({ kind: 'session' })
+    controller.open(MESSAGE_TARGET)
     controller.dispose()
     expect(controller.state.getSnapshot()).toEqual({
-      target: null, category: null, text: '', submitting: false, failure: null, toast: 0,
+      target: null,
+      category: null,
+      text: '',
+      submitting: false,
+      failure: null,
+      toast: 0,
+      receipt: null,
+      failureMessage: null,
     })
   })
+})
+
+it('keeps the description editable when a submission unexpectedly throws', async () => {
+  const { controller } = bench(async () => {
+    throw new Error('transport')
+  })
+  controller.open({ kind: 'session' })
+  controller.edit({ text: 'keep this draft' })
+  await controller.submitDraft()
+  expect(controller.state.getSnapshot()).toMatchObject({ text: 'keep this draft', submitting: false, failure: 'submit-failed', toast: 0 })
 })

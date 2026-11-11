@@ -61,29 +61,39 @@ async function bench(options: { recordResult?: unknown; recordCarrier?: unknown 
     }
   }
   const sessionFeedback = {
-    record: (request: unknown) => {
-      calls.push({ method: 'record', request })
+    submit: (request: unknown) => {
+      calls.push({ method: 'submit', request })
       if (options.recordCarrier !== undefined) return Promise.resolve(options.recordCarrier)
-      return carried(options.recordResult ?? { ok: true as const, value: { recorded: true as const } })
+      return carried(
+        options.recordResult ?? {
+          ok: true as const,
+          value: { reportId: '19060d14-8db5-4894-adcf-13e73db786c1', receivedAt: '2026-11-05T06:16:07Z' },
+        },
+      )
     },
   }
   new RemoteService(ctx)
   ctx.provide('remote.messageFeedback', messageFeedback)
   ctx.provide('remote.sessionFeedback', sessionFeedback)
   await ctx.plugin(SlotRegistry).await()
-  ctx.slots.register({
-    name: 'root',
-    children: {
-      'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
-      'conversation.input.overlay': { kind: 'list', scope: 'session' },
-    },
-  } as never, (() => null) as never)
+  ctx.slots.register(
+    {
+      name: 'root',
+      children: {
+        'conversation.chat.assistant-actions': { kind: 'list', scope: 'session' },
+        'conversation.input.overlay': { kind: 'list', scope: 'session' },
+      },
+    } as never,
+    (() => null) as never,
+  )
   ctx.provide('locale', new LocaleRuntime(ctx))
   const decorations = new Map<string, CommandDecoration>()
   ctx.provide('commandUi', {
     decorate: (decoration: CommandDecoration) => {
       decorations.set(decoration.name, decoration)
-      return () => { decorations.delete(decoration.name) }
+      return () => {
+        decorations.delete(decoration.name)
+      }
     },
   })
   const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -189,15 +199,19 @@ describe('ui-message-feedback browser plugin', () => {
     decoration.ui.run({ sessionId: sid('s1') })
     dialog.edit({ category: 'service-stability', text: 'timed out' })
     await dialog.submit()
-    expect(b.calls.filter(call => call.method === 'record')[0]?.request)
-      .toEqual({ sessionId: 's1', text: 'timed out', category: 'service-stability' })
+    expect(b.calls.filter(call => call.method === 'submit')[0]?.request).toEqual({ sessionId: 's1', description: 'timed out' })
     expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: null, toast: 1 })
 
     message.openDialog(MSG, 'positive')
     dialog.edit({ category: 'task-result' })
+    dialog.edit({ text: 'test feedback' })
     await dialog.submit()
     expect(b.calls.filter(call => call.method === 'put')[0]?.request).toMatchObject({
-      sessionId: 's1', messageId: MSG, rating: 'positive', category: 'task-result', ifVersion: 'v1',
+      sessionId: 's1',
+      messageId: MSG,
+      rating: 'positive',
+      category: 'task-result',
+      ifVersion: 'v1',
     })
     expect(dialog.hooks.dialog.getSnapshot().toast).toBe(2)
     dialog.dismissToast(2)
@@ -205,13 +219,16 @@ describe('ui-message-feedback browser plugin', () => {
   })
 
   it('keeps the dialog open with the carrier code when the record call itself fails', async () => {
-    const b = await bench({ recordCarrier: { ok: false as const, error: { code: 'gateway/internal', message: 'socket closed', details: {} } } })
+    const b = await bench({
+      recordCarrier: { ok: false as const, error: { code: 'gateway/internal', message: 'socket closed', details: {} } },
+    })
     await b.fiber.await()
     const dialog = b.dialogEntry()!.inject!(sid('s1'))
     const decoration = b.decorations.get('feedback')
     if (decoration?.ui.kind !== 'action') throw new Error('the /feedback decoration is not an action')
     decoration.ui.run({ sessionId: sid('s1') })
 
+    dialog.edit({ text: 'test feedback' })
     await dialog.submit()
 
     expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: { kind: 'session' }, failure: 'gateway/internal', toast: 0 })
@@ -229,6 +246,7 @@ describe('ui-message-feedback browser plugin', () => {
     if (decoration?.ui.kind !== 'action') throw new Error('the /feedback decoration is not an action')
     decoration.ui.run({ sessionId: sid('gone') })
 
+    dialog.edit({ text: 'test feedback' })
     await dialog.submit()
 
     expect(dialog.hooks.dialog.getSnapshot()).toMatchObject({ target: { kind: 'session' }, failure: 'session-not-found' })
@@ -259,10 +277,7 @@ describe('ui-message-feedback browser plugin', () => {
 
     await one.ensure()
     await two.ensure()
-    expect(b.calls.filter(call => call.method === 'list').map(call => call.request)).toEqual([
-      { sessionId: 's1' },
-      { sessionId: 's2' },
-    ])
+    expect(b.calls.filter(call => call.method === 'list').map(call => call.request)).toEqual([{ sessionId: 's1' }, { sessionId: 's2' }])
   })
 
   it('routes only a matching retraction to the Remote', async () => {
@@ -277,7 +292,8 @@ describe('ui-message-feedback browser plugin', () => {
 
     expect(b.calls.filter(call => call.method === 'put')).toHaveLength(0)
     expect(b.calls.filter(call => call.method === 'delete')[0]?.request).toMatchObject({
-      sessionId: 's1', messageId: MSG,
+      sessionId: 's1',
+      messageId: MSG,
     })
   })
 
@@ -331,6 +347,8 @@ describe('ui-message-feedback browser plugin', () => {
   })
 
   it('the node half applies without host-side behavior', () => {
-    expect(() => { nodeApply() }).not.toThrow()
+    expect(() => {
+      nodeApply()
+    }).not.toThrow()
   })
 })

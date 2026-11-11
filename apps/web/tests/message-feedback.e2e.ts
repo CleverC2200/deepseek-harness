@@ -168,14 +168,11 @@ describe('web e2e: durable per-message feedback', () => {
     await page.getByRole('menuitem', { name: 'Feedback', exact: true }).click()
     await dialog.waitFor()
     expect(await dialog.getByRole('textbox', { name: 'Feedback details' }).inputValue()).toBe('')
-    await dialog.getByRole('button', { name: 'Product features and interaction', exact: true }).click()
     await dialog.getByRole('textbox', { name: 'Feedback details' }).fill('Feedback from the Session menu.')
     await dialog.getByRole('button', { name: 'Submit', exact: true }).click()
-    await expect.poll(() => dialog.count()).toBe(0)
-    await page.getByRole('alert').filter({ hasText: 'Thanks for your feedback' }).waitFor()
-    expect(feedbackEvents().slice(before)).toMatchObject([
-      { type: 'feedback/record', data: { category: 'product-interaction', text: 'Feedback from the Session menu.' } },
-    ])
+    await page.getByRole('alert').filter({ hasText: 'Feedback submission is not connected in this client' }).waitFor()
+    expect(await dialog.getByRole('textbox', { name: 'Feedback details' }).inputValue()).toBe('Feedback from the Session menu.')
+    expect(feedbackEvents()).toHaveLength(before)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 60_000)

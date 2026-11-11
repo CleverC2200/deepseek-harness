@@ -24,7 +24,14 @@ const t = makeTranslate(zh, commonZh)
 /** Render the entry over a fixed state and recording verbs. */
 function mount(overrides: Partial<FeedbackDialogState> = {}) {
   const state: FeedbackDialogState = {
-    target: { kind: 'session' }, category: null, text: '', submitting: false, failure: null, toast: 0,
+    target: { kind: 'message', messageId: 'm-1' as never, rating: 'positive' },
+    category: null,
+    text: '',
+    submitting: false,
+    failure: null,
+    toast: 0,
+    receipt: null,
+    failureMessage: null,
     ...overrides,
   }
   const verbs = {
@@ -35,9 +42,12 @@ function mount(overrides: Partial<FeedbackDialogState> = {}) {
     dismissToast: vi.fn(),
   }
   const useDialog = (<T,>(select: (v: FeedbackDialogState) => T): T =>
-    useSyncExternalStore(() => () => {}, () => select(state))) as never
+    useSyncExternalStore(
+      () => () => {},
+      () => select(state),
+    )) as never
   const props = { useDialog, ...verbs, t } as Parameters<typeof FeedbackDialog>[0]
-  return { ...render(<FeedbackDialog {...props} />), ...verbs }
+  return { ...render(<FeedbackDialog {...props} />), ...verbs, props }
 }
 
 describe('FeedbackDialog', () => {
@@ -46,6 +56,19 @@ describe('FeedbackDialog', () => {
     expect(en['dialog.hint']).toBe('Add details to help us improve. Your submission will include the current conversation log.')
     expect(zh['category.service-stability']).toBe('稳定性和速度')
     expect(en['category.service-stability']).toBe('Stability and speed')
+  })
+
+  it('shows only the description for a session and displays the server receipt', () => {
+    const ui = mount({ target: { kind: 'session' } })
+    expect(ui.queryByRole('group')).toBeNull()
+    expect(ui.getByRole('textbox').getAttribute('maxlength')).toBe('4000')
+    cleanup()
+    const receipt = mount({
+      target: null,
+      toast: 1,
+      receipt: { reportId: '19060d14-8db5-4894-adcf-13e73db786c1' as never, receivedAt: '2026-11-05T06:16:07Z' },
+    })
+    expect(receipt.getByRole('alert').textContent).toContain('19060d14-8db5-4894-adcf-13e73db786c1')
   })
 
   it('renders nothing but the probe while closed with no toast', () => {
@@ -61,9 +84,7 @@ describe('FeedbackDialog', () => {
     const dialog = ui.getByRole('dialog', { name: zh['dialog.title'] })
     expect(dialog).toBeTruthy()
     const chips = ui.getByRole('group', { name: zh['dialog.categories'] }).querySelectorAll('button')
-    expect([...chips].map(chip => chip.textContent)).toEqual(
-      FEEDBACK_CATEGORIES.map(category => zh[`category.${category}`]),
-    )
+    expect([...chips].map(chip => chip.textContent)).toEqual(FEEDBACK_CATEGORIES.map(category => zh[`category.${category}`]))
     expect(ui.getByLabelText(zh['dialog.detail']).getAttribute('placeholder')).toBe(zh['dialog.hint'])
     expect(ui.getByRole('button', { name: commonZh.submit }).hasAttribute('disabled')).toBe(false)
   })
@@ -122,7 +143,9 @@ describe('FeedbackDialog', () => {
     try {
       const ui = mount({ failure: 'version-conflict' })
 
-      act(() => { vi.advanceTimersByTime(7000) })
+      act(() => {
+        vi.advanceTimersByTime(7000)
+      })
 
       expect(ui.dismissFailure).toHaveBeenCalledTimes(1)
     } finally {
@@ -144,10 +167,27 @@ describe('FeedbackDialog', () => {
       const ui = mount({ target: null, toast: 3 })
 
       expect(ui.getByRole('alert').textContent).toBe(zh['toast.recorded'])
-      act(() => { vi.advanceTimersByTime(4000) })
+      act(() => {
+        vi.advanceTimersByTime(4000)
+      })
       expect(ui.dismissToast).toHaveBeenCalledWith(3)
     } finally {
       vi.useRealTimers()
     }
   })
+})
+
+it('preserves a receipt toast when slot injection supplies fresh callbacks', () => {
+  const ui = mount({
+    target: null,
+    toast: 1,
+    receipt: { reportId: '19060d14-8db5-4894-adcf-13e73db786c1' as never, receivedAt: '2026-11-05T06:16:07Z' },
+  })
+  const dismissToast = vi.fn()
+  ui.rerender(<FeedbackDialog {...ui.props} dismissToast={dismissToast} />)
+  expect(ui.dismissToast).not.toHaveBeenCalled()
+  expect(dismissToast).not.toHaveBeenCalled()
+  expect(ui.getByRole('alert').textContent).toContain('19060d14')
+  ui.unmount()
+  expect(dismissToast).toHaveBeenCalledWith(1)
 })
