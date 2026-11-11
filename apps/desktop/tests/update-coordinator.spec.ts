@@ -95,6 +95,7 @@ describe('desktop update coordinator', () => {
     const takeover = new DesktopRestartUpdate({
       host: () => ({ updateTasks: async () => false, updateOperation: async request => request.action === 'plugins-status'
         ? { ok: true, value: { operationId: null, state: 'failed' } } : { ok: true, value: {} } }),
+      recoverLockedHost: async () => ({ updateTasks: async () => false, updateOperation: async () => ({ ok: true, value: { operationId: null, state: 'failed' } }) }),
       state: () => f.coordinator.state,
       download: version => f.coordinator.download(version), install: version => f.coordinator.install(version),
       block: () => {}, progress: () => {}, stop: async () => {}, relaunch: async () => {}, wait: async () => {},

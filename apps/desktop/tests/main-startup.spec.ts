@@ -1416,6 +1416,59 @@ describe('desktop main startup', () => {
     expect(harness.app.relaunch).toHaveBeenCalledOnce()
   })
 
+  it('rechecks a fatal Host through the native action and permits refreshed boot while ordinary input stays blocked', async () => {
+    const host = await readyForUpdate()
+    await invoke(DESKTOP_IPC.boot, 'app')
+    host.updateOperation.mockResolvedValue({ ok: true, value: { operationId: 'native-one', state: 'running' } })
+    const answer = Promise.withResolvers<{ response: number }>()
+    let shown = false
+    harness.dialog.showMessageBox.mockImplementation((options: MessageBoxOptions) => {
+      if (options.message === en.takeoverUnknown && !shown) { shown = true; return answer.promise }
+      return new Promise(() => {})
+    })
+    const pending = invoke(DESKTOP_IPC.updatesRestart, 'app', { kind: 'plugins', plans: [{ packageName: 'plugin', planId: 'approved' }] })
+    await vi.advanceTimersByTimeAsync(0)
+    const failure = new DesktopHostFatalError('Host exited during update', 'fatal update Host diagnostic')
+    host.onFailure!(failure)
+    expect(writeCrashReport).toHaveBeenCalledOnce()
+    expect(vi.mocked(writeCrashReport).mock.calls[0]![1]).toMatchObject({
+      source: 'host', error: failure, hostDiagnostic: failure.diagnostic,
+    })
+    answer.resolve({ response: 0 })
+    await host.stopping.promise
+    expect(harness.hosts).toHaveLength(1)
+    host.exited.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.hosts).toHaveLength(2)
+    const replacement = harness.hosts[1]!
+    replacement.url = 'http://127.0.0.1:3099/?token=replacement'
+    replacement.ready.resolve()
+    await replacement.stopping.promise
+    expect(harness.windows[0]!.urls).toEqual(['dsh-app://app/', 'dsh-app://app/'])
+    expect(replacement.updateTasks).toHaveBeenCalledWith('lock')
+    expect(replacement.updateOperation).toHaveBeenCalledWith({ action: 'plugins-status', operationId: 'native-one' })
+    expect(() => invoke(DESKTOP_IPC.restart, 'app')).toThrow(/updating/)
+    replacement.exited.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    await pending
+    expect(harness.app.relaunch).toHaveBeenCalledOnce()
+  })
+
+  it('serves refreshed boot injections during takeover without admitting ordinary IPC', async () => {
+    const host = await readyForUpdate()
+    await invoke(DESKTOP_IPC.boot, 'app')
+    host.updateOperation.mockResolvedValue({ ok: true, value: { operationId: 'native-one', state: 'running' } })
+    const pending = invoke(DESKTOP_IPC.updatesRestart, 'app', { kind: 'plugins-restart' })
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(invoke(DESKTOP_IPC.boot, 'app')).resolves.toEqual({ injections: [], streamBaseUrl: 'http://127.0.0.1:3080' })
+    expect(() => invoke(DESKTOP_IPC.restart, 'app')).toThrow(/updating/)
+    host.updateOperation.mockResolvedValue({ ok: true, value: { operationId: 'native-one', state: 'ready' } })
+    await vi.advanceTimersByTimeAsync(1000)
+    await host.stopping.promise
+    host.exited.resolve()
+    await pending
+  })
+
   it('defers the downloaded-update confirmation until the hidden window is shown again', async () => {
     await readyWorkspace()
     const window = harness.windows[0]!

@@ -45,6 +45,7 @@ function parse(input: unknown): DesktopRestartUpdateRequest {
 
 interface RestartDependencies {
   host(): { updateTasks(action: 'lock' | 'unlock'): Promise<boolean>; updateOperation(request: DesktopHostUpdateRequest): Promise<DesktopHostUpdateResult> } | undefined
+  recoverLockedHost(): Promise<ReturnType<RestartDependencies['host']>>
   state(): DesktopUpdateState
   download(version: string): Promise<DesktopUpdateState>
   install(version: string): Promise<DesktopUpdateState>
@@ -56,7 +57,8 @@ interface RestartDependencies {
 }
 
 export class DesktopRestartUpdate {
-  private recoverable = false
+  private paused = false
+  private interrupted = Promise.withResolvers<void>()
   private recovery: Promise<void> | undefined
   private operation: { key: string; request: DesktopRestartUpdateRequest; operationId?: string; promise: Promise<void> } | undefined
   constructor(private readonly dependencies: RestartDependencies) {}
@@ -70,54 +72,77 @@ export class DesktopRestartUpdate {
       return this.operation.promise
     }
     if (request.kind === 'desktop' && request.version !== this.dependencies.state().version) throw new Error('desktop update: target changed')
+    this.paused = false
+    this.interrupted = Promise.withResolvers<void>()
     this.dependencies.block(true)
     const promise = Promise.resolve().then(() => this.run(request))
     this.operation = { key, request, promise }
     return promise
   }
 
-  failed(): void { this.recoverable = true; this.dependencies.progress('unknown') }
+  failed(): void { this.paused = true; this.interrupted.resolve(); this.dependencies.progress('unknown') }
 
   recover(): Promise<void> {
-    if (!this.recoverable) return Promise.resolve()
-    this.recovery ??= this.doRecover().finally(() => { this.recovery = undefined })
+    if (this.recovery !== undefined) return this.recovery
+    if (!this.paused) return Promise.resolve()
+    this.recovery = this.doRecover().finally(() => { this.recovery = undefined })
     return this.recovery
   }
 
   private async doRecover(): Promise<void> {
     const current = this.operation
-    const host = this.dependencies.host()
-    if (current === undefined || host === undefined) { this.dependencies.progress('unknown'); return }
+    if (current === undefined) return
+    await current.promise.catch(() => undefined)
+    this.paused = false
     try {
+      const host = await this.dependencies.recoverLockedHost()
+      if (this.paused) return
+      if (host === undefined) { this.failed(); return }
+      if (current.request.kind === 'plugins' && current.operationId === undefined) { this.failed(); return }
       const result = await host.updateOperation({ action: 'plugins-status', ...current.operationId === undefined ? {} : { operationId: current.operationId } })
+      if (this.paused) return
       if (!result.ok && result.error.code === 'route-missing' && current.request.kind === 'desktop') {
         this.dependencies.progress('restarting')
         const installed = await this.dependencies.install(current.request.version)
-        if (installed.phase !== 'installing') this.dependencies.progress('unknown')
+        if (this.paused) return
+        if (installed.phase !== 'installing') this.failed()
         return
       }
       if (!result.ok || typeof result.value !== 'object' || result.value === null || !('state' in result.value)) {
-        this.dependencies.progress('unknown'); return
+        this.failed(); return
       }
-      if (current.operationId !== undefined && (!('operationId' in result.value) || result.value.operationId !== current.operationId)) { this.dependencies.progress('unknown'); return }
-      if (result.value.state === 'running' || result.value.state === 'unknown') { this.dependencies.progress('unknown'); return }
-      if (current.request.kind === 'desktop' && result.value.state !== 'ready') {
+      if (current.operationId !== undefined && (!('operationId' in result.value) || result.value.operationId !== current.operationId)) { this.failed(); return }
+      if (result.value.state === 'running' || result.value.state === 'unknown') { this.failed(); return }
+      if (current.request.kind === 'desktop' && (result.value.state === 'idle' || result.value.state === 'failed')) {
         const cancelled = await host.updateOperation({ action: 'desktop-cancel' })
-        if (!cancelled.ok && cancelled.error.code !== 'route-missing') { this.dependencies.progress('unknown'); return }
+        if (this.paused) return
+        if (!cancelled.ok && cancelled.error.code !== 'route-missing') { this.failed(); return }
       }
       if (result.value.state === 'ready') {
+        if (!('operationId' in result.value) || !text(result.value.operationId)) { this.failed(); return }
         this.dependencies.progress('restarting')
-        if (current.request.kind === 'desktop') await this.dependencies.install(current.request.version)
-        else { await this.dependencies.stop(); await this.dependencies.relaunch() }
+        if (current.request.kind === 'desktop') {
+          const installed = await this.dependencies.install(current.request.version)
+          if (this.paused) return
+          if (installed.phase !== 'installing') { this.failed(); return }
+        }
+        else {
+          await this.dependencies.stop()
+          if (this.paused) return
+          await this.dependencies.relaunch()
+        }
         return
       }
       if (result.value.state === 'idle' || result.value.state === 'failed') {
         await host.updateTasks('unlock')
+        if (this.paused) return
         this.operation = undefined
         this.dependencies.block(false)
         this.dependencies.progress('failed')
+        return
       }
-    } catch { this.dependencies.progress('unknown') }
+      this.failed()
+    } catch { this.failed() }
   }
 
   private async run(request: DesktopRestartUpdateRequest): Promise<void> {
@@ -127,10 +152,12 @@ export class DesktopRestartUpdate {
       if (host === undefined) throw new Error('desktop update: Host unavailable')
       this.dependencies.progress('preparing')
       await host.updateTasks('lock')
+      if (this.paused) return
       safe = true
       if (request.kind === 'desktop') {
         safe = false
         const prepared = await host.updateOperation({ action: 'desktop-prepare', desktopVersion: request.version })
+        if (this.paused) return
         if (!prepared.ok && prepared.error.code !== 'route-missing') {
           const status = await host.updateOperation({ action: 'plugins-status' })
           safe = status.ok && typeof status.value === 'object' && status.value !== null && 'state' in status.value
@@ -141,6 +168,7 @@ export class DesktopRestartUpdate {
         const current = this.dependencies.state()
         const retained = current.phase === 'ready' || (current.phase === 'error' && current.failedOperation === 'install')
         const downloaded = retained ? current : await this.dependencies.download(request.version)
+        if (this.paused) return
         if (!retained && downloaded.phase !== 'ready') {
           const cancelled = await host.updateOperation({ action: 'desktop-cancel' })
           safe = cancelled.ok || (!cancelled.ok && cancelled.error.code === 'route-missing')
@@ -148,6 +176,7 @@ export class DesktopRestartUpdate {
         }
         this.dependencies.progress('restarting')
         const installed = await this.dependencies.install(request.version)
+        if (this.paused) return
         if (installed.phase !== 'installing') throw new Error('desktop update: installation failed')
         return
       }
@@ -159,6 +188,7 @@ export class DesktopRestartUpdate {
           || !('operationId' in accepted.value) || !text(accepted.value.operationId)) throw new Error('desktop update: installation state unavailable')
         operationId = accepted.value.operationId
         if (this.operation !== undefined) this.operation.operationId = operationId
+        if (this.paused) return
       }
       safe = false
       this.dependencies.progress('plugins')
@@ -166,21 +196,30 @@ export class DesktopRestartUpdate {
         let status: DesktopHostUpdateResult
         try { status = await host.updateOperation({ action: 'plugins-status', ...operationId === undefined ? {} : { operationId } }) }
         catch { status = { ok: false, error: { code: 'host-unavailable' } } }
+        if (this.paused) return
         if (status.ok && typeof status.value === 'object' && status.value !== null && 'state' in status.value
           && 'operationId' in status.value && (operationId === undefined || operationId === status.value.operationId)) {
+          if ((status.value.state === 'ready' || status.value.state === 'running') && text(status.value.operationId)) {
+            operationId = status.value.operationId
+            if (this.operation !== undefined) this.operation.operationId = operationId
+          }
           if (status.value.state === 'ready' && text(status.value.operationId)) break
           if (status.value.state === 'failed' || (request.kind === 'plugins-restart' && status.value.state === 'idle')) {
             safe = true
             throw new Error('desktop update: plugin installation failed')
           }
-          this.dependencies.progress(status.value.state === 'running' ? 'plugins' : 'unknown')
-        } else this.dependencies.progress('unknown')
-        await this.dependencies.wait()
+          if (status.value.state !== 'running') { this.failed(); return }
+          this.dependencies.progress('plugins')
+        } else { this.failed(); return }
+        await Promise.race([this.dependencies.wait(), this.interrupted.promise])
+        if (this.paused) return
       }
       this.dependencies.progress('restarting')
       await this.dependencies.stop()
+      if (this.paused) return
       await this.dependencies.relaunch()
     } catch (error) {
+      if (this.paused) throw error
       if (safe) {
         try { await host?.updateTasks('unlock') }
         catch { this.failed(); throw error }

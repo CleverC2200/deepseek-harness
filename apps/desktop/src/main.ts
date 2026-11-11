@@ -522,7 +522,10 @@ async function main(): Promise<void> {
       inspectQuit: () => host.inspectQuit(),
     }
   }, (state) => {
-    if (state.phase === 'error' && desktopUpdating()) restartTakeover.failed()
+    if (state.phase === 'error' && desktopUpdating()) {
+      void persistCrashReport(state.failure, 'host')
+      restartTakeover.failed()
+    }
     else if (state.phase === 'error') reportFatal(state.failure, 'host')
     else if (!shuttingDown) backendReady = state.phase === 'ready'
   })
@@ -683,7 +686,20 @@ async function main(): Promise<void> {
     }).catch((error: unknown) => { console.error(error) })
   }
   const restartTakeover: DesktopRestartUpdate = new DesktopRestartUpdate({
-    host: () => backend.host, state: () => updates.state,
+    host: () => backend.host,
+    recoverLockedHost: async () => {
+      await startup?.catch(() => undefined)
+      await workspaceRecovery?.catch(() => undefined)
+      const previous = backend.host
+      await backend.start(prepareHostEnvironment)
+      await backend.host?.updateTasks('lock')
+      if (backend.host !== previous) {
+        navigation = undefined
+        await navigateMain(applicationUrl)
+      }
+      return backend.host
+    },
+    state: () => updates.state,
     download: version => updates.download(version), install: version => updates.install(version),
     block: (active) => {
       setDesktopUpdating(active)
@@ -772,14 +788,14 @@ async function main(): Promise<void> {
   app.on('will-quit', () => { shortcuts.dispose() })
 
   ipcMain.handle(DESKTOP_IPC.boot, async (event) => {
-    assertDesktopSender(event, ['app'])
+    assertDesktopSender(event, ['app'], true)
     await startup
     if (backend.host === undefined || hostUrl === undefined) throw new Error('Desktop Host is unavailable')
     return { injections, streamBaseUrl: new URL(hostUrl).origin }
   })
 
   ipcMain.handle(DESKTOP_IPC.bootFailed, (event, message: unknown) => {
-    assertDesktopSender(event, ['app'])
+    assertDesktopSender(event, ['app'], true)
     if (event.sender !== mainWindow?.webContents || event.senderFrame !== event.sender.mainFrame) {
       throw new Error('dsh desktop: rejected startup failure from a non-primary frame')
     }
