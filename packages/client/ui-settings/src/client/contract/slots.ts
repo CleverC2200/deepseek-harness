@@ -19,6 +19,10 @@ declare module '@deepseek-ai/cordis' {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /**
+     * Replace the native update control in the sidebar. The owner supplies its
+     * width and hidden state; without a contribution the standard control renders.
+     */
     'settings.update': { kind: 'single'; scope: 'root'; owner: { wide: boolean; hidden: boolean } }
 
     /** Optional sidebar account launcher; opens the shell-owned settings panel. */

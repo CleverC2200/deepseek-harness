@@ -2049,6 +2049,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Host Remote through which a product surface records a Session-level remark.',
     methods: [
       {
+        signature: 'registerSubmit(handler: SessionFeedbackSubmitHandler): () => void',
+        description: 'Install the single product submission provider.',
+        parameters: [{ name: 'handler', description: 'product-owned upload operation, including authorization.' }],
+        returns: 'disposer that releases this provider only.',
+      },
+      {
+        signature: '@Remote(\'submit\') async submit(request: SessionFeedbackSubmitRequest): Promise<SessionFeedbackSubmitResult>',
+        description: 'Submit a non-empty description through the installed product provider.',
+        parameters: [{ name: 'request', description: 'live Session and a description of at most 4000 characters.' }],
+        returns: 'accepted receipt or a failure, including when no provider is installed.',
+      },
+      {
         signature: '@Remote(\'record\') record(request: SessionFeedbackRecordRequest): Promise<SessionFeedbackRecordResult>',
         description: 'Record one remark on a live Session.',
         parameters: [{ name: 'request', description: 'target Session plus the optional text and category.' }],
@@ -6570,6 +6582,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionEventWindow {\n    session: SessionHeader;\n    inheritedEventCount: SessionLogOffset;\n    target: SessionEvent;\n    events: SessionEvent[];\n    startSeq: SessionSeq;\n    endSeq: SessionSeq;\n}',
   },
   {
+    name: 'SessionFeedbackReceipt',
+    declaration: 'export interface SessionFeedbackReceipt {\n    readonly reportId: SessionFeedbackReportId;\n    readonly receivedAt: string;\n}',
+  },
+  {
     name: 'SessionFeedbackRecordRequest',
     declaration: 'export interface SessionFeedbackRecordRequest {\n    readonly sessionId: SessionId;\n    readonly text?: string;\n    readonly category?: FeedbackCategory;\n}',
   },
@@ -6582,8 +6598,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionFeedbackRecordValue {\n    readonly recorded: true;\n}',
   },
   {
+    name: 'SessionFeedbackReportId',
+    declaration: 'export type SessionFeedbackReportId = Branded<\'SessionFeedbackReportId\'>;',
+  },
+  {
     name: 'SessionFeedbackSessionNotFound',
     declaration: 'export interface SessionFeedbackSessionNotFound {\n    readonly code: \'session-not-found\';\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SessionFeedbackSubmitHandler',
+    declaration: 'export type SessionFeedbackSubmitHandler = (request: SessionFeedbackSubmitRequest) => Promise<SessionFeedbackSubmitResult>;',
+  },
+  {
+    name: 'SessionFeedbackSubmitRequest',
+    declaration: 'export interface SessionFeedbackSubmitRequest {\n    readonly sessionId: SessionId;\n    readonly description: string;\n}',
+  },
+  {
+    name: 'SessionFeedbackSubmitResult',
+    declaration: 'export type SessionFeedbackSubmitResult = {\n    readonly ok: true;\n    readonly value: SessionFeedbackReceipt;\n} | {\n    readonly ok: false;\n    readonly error: {\n        readonly code: string;\n        readonly message?: string;\n    };\n};',
   },
   {
     name: 'SessionFollowFrame',

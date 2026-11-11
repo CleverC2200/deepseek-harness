@@ -240,7 +240,8 @@ describe('current version', () => {
   })
 
   it('omits the row when the current version is unavailable', () => {
-    const view = render(<CurrentVersionRow {...kit} t={t} useVersion={bindSnapshotSelector(createSnapshotStore<string | undefined>(undefined))} />)
+    const useVersion = bindSnapshotSelector(createSnapshotStore<string | undefined>(undefined))
+    const view = render(<CurrentVersionRow {...kit} t={t} useVersion={useVersion} />)
     expect(view.container.textContent).toBe('')
   })
 })

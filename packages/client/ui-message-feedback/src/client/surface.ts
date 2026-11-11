@@ -1,7 +1,7 @@
 /**
  * One Session's feedback surface: the message-feedback object layer and the
  * dialog controller, plus the routing between them. A message target puts a
- * selected judgment through the message controller; the Session target records
+ * selected judgment through the message controller; the Session target submits
  * through the `sessionFeedback` Remote.
  * @module @deepseek-ai/dsh-client-ui-message-feedback/client/surface
  */
@@ -23,19 +23,31 @@ export class FeedbackSurface {
    * @param ctx - the browser plugin context carrying both feedback Remotes.
    * @param sessionId - Session owning the transcript and the remark.
    */
-  constructor(private readonly ctx: ClientContext, private readonly sessionId: SessionId) {
+  constructor(
+    private readonly ctx: ClientContext,
+    private readonly sessionId: SessionId,
+  ) {
     this.feedback = new MessageFeedbackController(ctx.remote.messageFeedback, sessionId)
-    this.dialog = new FeedbackDialogController((target, entry) => target.kind === 'message'
-      ? this.feedback.rate(target.messageId, target.rating, entry)
-      : this.recordSession(entry))
+    this.dialog = new FeedbackDialogController((target, entry) =>
+      target.kind === 'message' ? this.feedback.rate(target.messageId, target.rating, entry) : this.submitSession(entry),
+    )
   }
 
-  /** Record one Session-level remark through the sessionFeedback Remote. */
-  private async recordSession(entry: FeedbackRecord): Promise<MessageFeedbackActionResult> {
-    const carried = await this.ctx.remote.sessionFeedback.record({ sessionId: this.sessionId, ...entry })
+  /** Submit one Session-level report through the sessionFeedback Remote. */
+  private async submitSession(entry: FeedbackRecord): Promise<MessageFeedbackActionResult> {
+    if (typeof this.ctx.remote.sessionFeedback.submit !== 'function')
+      return { ok: false, error: { code: 'submit-unavailable', message: 'Session feedback submission is unavailable' } }
+    const carried = await this.ctx.remote.sessionFeedback.submit({ sessionId: this.sessionId, description: entry.text ?? '' })
     if (!carried.ok) return { ok: false, error: { code: carried.error.code, message: carried.error.message } }
-    if (carried.value.ok) return { ok: true }
-    return { ok: false, error: { code: carried.value.error.code, message: describe(carried.value.error.code) } }
+    if (carried.value.ok) return { ok: true, receipt: carried.value.value }
+    return {
+      ok: false,
+      error: {
+        code: carried.value.error.code,
+        message: carried.value.error.message ?? describe(carried.value.error.code),
+        ...(carried.value.error.message === undefined ? {} : { displayMessage: carried.value.error.message }),
+      },
+    }
   }
 
   /** Drop both controllers when the owning fiber unloads. */
