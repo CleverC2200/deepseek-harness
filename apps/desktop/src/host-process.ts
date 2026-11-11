@@ -3,6 +3,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 import type { PlatformSession } from '@deepseek-ai/dsh-deepseek-account'
+import { parseDesktopHostUpdateResult, type DesktopHostUpdateRequest, type DesktopHostUpdateResult } from './restart-update.ts'
 import { desktopNodeEnvironment } from './node-environment.ts'
 
 interface ReadyEvent {
@@ -23,7 +24,7 @@ interface PlatformSessionEvent {
   readonly session: PlatformSession | null
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | PlatformSessionEvent | { readonly type: 'shutdown-complete' } | {
+type DesktopHostEvent = { readonly type: 'update-operation'; readonly requestId: number; readonly result: unknown } | ReadyEvent | FatalEvent | PlatformSessionEvent | { readonly type: 'shutdown-complete' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -54,6 +55,8 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
   if (typeof message !== 'object' || message === null || !('type' in message)) return false
   const candidate = message as Record<string, unknown>
   switch (candidate.type) {
+    case 'update-operation':
+      return Number.isSafeInteger(candidate.requestId) && 'result' in candidate
     case 'shutdown-complete':
       return true
     case 'ready':
@@ -218,7 +221,7 @@ export class DesktopHostProcess {
       else if (message.type === 'fatal') this.fail(new DesktopHostFatalError(message.message, message.diagnostic))
       else {
         const request = this.controlRequests.get(message.requestId)
-        if (message.error === undefined) request?.resolve(message)
+        if (message.type === 'update-operation' || message.error === undefined) request?.resolve(message)
         else request?.reject(new Error(message.error))
       }
     })
@@ -257,8 +260,16 @@ export class DesktopHostProcess {
     return { activeTasks: response.activeTasks, scheduledTasks: response.scheduledTasks }
   }
 
+  async updateOperation(request: DesktopHostUpdateRequest): Promise<DesktopHostUpdateResult> {
+    const response = await this.control({ type: 'update-operation', request }, request.action === 'desktop-prepare' ? 15 * 60_000 : 10_000, 'desktop update: operation timed out')
+    if (response.type !== 'update-operation') throw new Error('desktop update: unexpected control response')
+    const result = parseDesktopHostUpdateResult(response.result)
+    if (result === undefined) throw new Error('desktop update: invalid operation response')
+    return result
+  }
+
   private async control(
-    request: { readonly type: 'update-tasks'; readonly action: 'inspect' | 'lock' | 'unlock' } | { readonly type: 'quit-inspection' },
+    request: { readonly type: 'update-operation'; readonly request: DesktopHostUpdateRequest } | { readonly type: 'update-tasks'; readonly action: 'inspect' | 'lock' | 'unlock' } | { readonly type: 'quit-inspection' },
     deadlineMs: number, deadlineMessage: string,
   ): Promise<DesktopHostControlResponse> {
     const child = this.child

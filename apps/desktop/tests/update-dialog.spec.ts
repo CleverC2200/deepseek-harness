@@ -17,6 +17,8 @@ const fixture = await vi.hoisted(async () => {
       insertCSS: vi.fn(async () => 'blur'),
       removeInsertedCSS: vi.fn(async () => {}),
     })
+    enabled = false
+    readonly setEnabled = vi.fn((enabled: boolean) => { this.enabled = enabled })
     readonly focus = vi.fn()
     readonly show = vi.fn()
     readonly setBounds = vi.fn()
@@ -213,4 +215,17 @@ it('reads the current locale for each presentation', async () => {
     dialogs!.cancel()
     await pending
   }
+})
+
+it('keeps native takeover progress open across Escape responses and window close', async () => {
+  const f = setup()
+  void dialogs!.show(f.parent as unknown as BrowserWindow, { message: '正在更新', buttons: [], blocking: true })
+  expect(fixture.windows.at(-1)!.enabled).toBe(true)
+  expect(f.parent.enabled).toBe(false)
+  expect(f.invoke(UPDATE_DIALOG_IPC.status)).toMatchObject({ dismissible: false, buttons: [] })
+  expect(() => f.invoke(UPDATE_DIALOG_IPC.respond, -1)).toThrow(/blocking/)
+  const event = { preventDefault: vi.fn() }
+  fixture.windows.at(-1)!.emit('close', event)
+  expect(event.preventDefault).toHaveBeenCalledOnce()
+  expect(dialogs!.isOpen).toBe(true)
 })

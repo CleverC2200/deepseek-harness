@@ -1,5 +1,6 @@
 /** Typed preload operations exposed only by the Electron shell. */
 
+import type { DesktopRestartUpdateRequest } from './restart-update.ts'
 import type { DesktopKeyboardApi, DesktopShortcutsApi } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { DesktopBrowserBridge } from '@deepseek-ai/dsh-client-ui-sidebar-browser/types'
@@ -28,6 +29,7 @@ export const DESKTOP_IPC = {
   updatesStatus: 'dsh-desktop:updates-status',
   updatesCheck: 'dsh-desktop:updates-check',
   updatesOpen: 'dsh-desktop:updates-open',
+  updatesRestart: 'dsh-desktop:updates-restart',
   restart: 'dsh-desktop:restart',
   updatesPresentation: 'dsh-desktop:updates-presentation',
   nativeThemeSet: 'dsh-desktop:native-theme-set',
@@ -71,7 +73,7 @@ export interface DesktopUpdatePresentation {
   readonly failure?: DesktopUpdateFailureKind
 }
 
-/** Product documents cannot supply update versions, package URLs, or installation authorization. */
+/** Product documents supply version-bound update intent; the main process owns execution. */
 export interface DshDesktopProductApi {
   readonly protocolVersion: 1
   readonly browser: DesktopBrowserBridge
@@ -88,9 +90,15 @@ export interface DshDesktopProductApi {
     check(): Promise<DesktopUpdatePresentation>
     status(): Promise<DesktopUpdatePresentation>
     open(version?: string): Promise<void>
+    restartUpdate(request: DesktopRestartUpdateRequest): Promise<void>
     subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
   }
 }
+
+let updating = false
+
+export function setDesktopUpdating(active: boolean): void { updating = active }
+export function desktopUpdating(): boolean { return updating }
 
 /** Scheme of Desktop-owned application documents. */
 export const SCHEME = 'dsh-app'
@@ -100,7 +108,8 @@ export const SCHEME = 'dsh-app'
  * @param event - IPC caller whose frame URL supplies the origin.
  * @param hostnames - Desktop document hosts allowed for this operation.
  */
-export function assertDesktopSender(event: IpcMainInvokeEvent, hostnames: readonly string[]): void {
+export function assertDesktopSender(event: IpcMainInvokeEvent, hostnames: readonly string[], allowWhileUpdating = false): void {
+  if (updating && !allowWhileUpdating) throw new Error('desktop update: client is updating')
   const senderFrame = event.senderFrame
   if (senderFrame === null) throw new Error('dsh desktop: rejected IPC without a sender frame')
   const url = new URL(senderFrame.url)

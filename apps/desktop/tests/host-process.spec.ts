@@ -30,6 +30,10 @@ server.listen(0, '127.0.0.1', () => {
   process.send({ type: 'ready', url: 'http://127.0.0.1:' + server.address().port + '/?token=fixture' })
 })
 process.on('message', message => {
+  if (message.type === 'update-operation') {
+    process.send({ type: 'update-operation', requestId: message.requestId, result: { ok: true, value: { operationId: message.request.operationId ?? null, state: 'ready' } } })
+    return
+  }
   if (message.type === 'update-tasks') {
     process.send({ type: 'update-tasks', requestId: message.requestId, active: message.action === 'lock' })
     return
@@ -81,6 +85,21 @@ describe('desktop host process', () => {
       .toEqual([false, true, false])
     await host.stop(true)
     await expect(host.updateTasks('inspect')).rejects.toThrow('Host is unavailable')
+  })
+
+  it('correlates fixed update operations over the real private child channel', async () => {
+    const host = hostProcess(projectWithHost())
+    await host.start()
+    expect(await host.updateOperation({ action: 'plugins-status', operationId: 'native-operation' }))
+      .toEqual({ ok: true, value: { operationId: 'native-operation', state: 'ready' } })
+    await host.stop(true)
+  })
+
+  it('rejects a malformed update reply without terminating a potentially active writer', async () => {
+    const host = hostProcess(projectWithHost(HTTP_HOST.replace("result: { ok: true, value: { operationId: message.request.operationId ?? null, state: 'ready' } }", "result: { ok: false, error: { code: 'unbounded raw error with spaces' } }")))
+    await host.start()
+    await expect(host.updateOperation({ action: 'plugins-status' })).rejects.toThrow()
+    expect(await host.updateTasks('inspect')).toBe(false)
   })
 
   it('correlates quit inspections with task requests and fails an unanswered one at its own deadline', async () => {

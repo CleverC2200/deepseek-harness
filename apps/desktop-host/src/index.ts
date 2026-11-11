@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-deepseek-account'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import * as desktopOffice from './office.ts'
 
+import { dispatchDesktopUpdate } from './update-operation.ts'
 import { installDesktopUpdateTaskControl } from './update-tasks.ts'
 import { installDesktopQuitInspection } from './quit-inspection.ts'
 import { installPlatformSessionPublisher } from './platform-session.ts'
@@ -58,6 +59,18 @@ export async function main(): Promise<void> {
   })()
   process.on('message', (message: unknown) => {
     if (typeof message !== 'object' || message === null || !('type' in message)) return
+    if (message.type === 'update-operation') {
+      if (!('requestId' in message) || !Number.isSafeInteger(message.requestId) || !('request' in message)) return
+      const { requestId, request } = message
+      void (async () => {
+        const running = await application
+        const result = stopping === undefined
+          ? await dispatchDesktopUpdate(running.ctx.connection, request)
+          : { ok: false, error: { code: 'host-stopping' } }
+        await send({ type: 'update-operation', requestId, result })
+      })().catch(() => { void send({ type: 'update-operation', requestId, result: { ok: false, error: { code: 'host-unavailable' } } }) })
+      return
+    }
     if (message.type === 'shutdown') { void stop(); return }
     if (message.type === 'quit-inspection') {
       if (!('requestId' in message) || !Number.isSafeInteger(message.requestId)) return

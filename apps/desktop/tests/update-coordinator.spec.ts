@@ -4,6 +4,7 @@ import type { AppUpdater } from 'electron-updater'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import { parseDesktopRelease } from '../src/release.ts'
 import type { DesktopUpdateState } from '../src/ipc.ts'
+import { DesktopRestartUpdate } from '../src/restart-update.ts'
 import { DesktopUpdatePreparationError } from '../src/update-error.ts'
 import { zh } from '../src/locale.ts'
 
@@ -85,6 +86,28 @@ describe('desktop update coordinator', () => {
     f.beforeRestart.mockResolvedValueOnce(false)
     expect(await f.coordinator.install('1.1.0-rc.2')).toEqual({ phase: 'ready', version: '1.1.0-rc.2' })
     expect(f.quitAndInstall).not.toHaveBeenCalled()
+  })
+
+  it('retries a retained installer failure from native takeover without downloading again', async () => {
+    const f = fixture()
+    await f.coordinator.check()
+    f.beforeRestart.mockRejectedValueOnce(new Error('installer preparation failed'))
+    const takeover = new DesktopRestartUpdate({
+      host: () => ({ updateTasks: async () => false, updateOperation: async request => request.action === 'plugins-status'
+        ? { ok: true, value: { operationId: null, state: 'failed' } } : { ok: true, value: {} } }),
+      recoverLockedHost: async () => ({ updateTasks: async () => false, updateOperation: async () => ({ ok: true, value: { operationId: null, state: 'failed' } }) }),
+      state: () => f.coordinator.state,
+      download: version => f.coordinator.download(version), install: version => f.coordinator.install(version),
+      block: () => {}, progress: () => {}, stop: async () => {}, relaunch: async () => {}, wait: async () => {},
+    })
+    const intent = { kind: 'desktop', version: '1.1.0-rc.2' }
+    await expect(takeover.start(intent)).rejects.toThrow(/installation failed/)
+    expect(f.coordinator.state).toMatchObject({ phase: 'error', failedOperation: 'install' })
+    await takeover.recover()
+    expect(takeover.active).toBe(false)
+    await expect(takeover.start(intent)).resolves.toBeUndefined()
+    expect(f.downloadUpdate).toHaveBeenCalledOnce()
+    expect(f.quitAndInstall).toHaveBeenCalledOnce()
   })
 
   it('retains an asynchronous installer failure after quitAndInstall returns', async () => {
