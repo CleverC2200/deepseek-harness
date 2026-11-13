@@ -288,3 +288,49 @@ it('keeps a second Host failure blocked instead of relaunching from a late recov
   expect(events).not.toContain('relaunch')
   expect(hosts).toHaveLength(2)
 })
+
+
+it.each([
+  { kind: 'desktop', version: '2.0.0' },
+  { kind: 'plugins', plans: [{ packageName: 'plugin', planId: 'approved' }] },
+  { kind: 'plugins-restart' },
+])('restores ordinary operations when admission times out before an update is submitted: %j', async (request) => {
+  const { restart, host, operation, events, progress } = setup()
+  host.updateTasks.mockRejectedValueOnce(new Error('desktop update: task inspection timed out'))
+  await expect(restart.start(request)).rejects.toThrow('task inspection timed out')
+  expect(operation).not.toHaveBeenCalled()
+  expect(host.updateTasks.mock.calls).toEqual([['lock'], ['unlock']])
+  expect(restart.active).toBe(false)
+  expect(events).toContain('unblock')
+  expect(progress).toHaveBeenLastCalledWith('failed')
+})
+
+it('rechecks an admission failure without requiring an update operation that was never submitted', async () => {
+  const { restart, host, operation, events } = setup()
+  host.updateTasks.mockRejectedValueOnce(new Error('admission timeout'))
+    .mockRejectedValueOnce(new Error('unlock unavailable'))
+  await expect(restart.start({ kind: 'plugins', plans: [{ packageName: 'plugin', planId: 'approved' }] }))
+    .rejects.toThrow('admission timeout')
+  expect(restart.active).toBe(true)
+  expect(events).not.toContain('unblock')
+  await restart.recover()
+  expect(host.updateTasks.mock.calls).toEqual([['lock'], ['unlock'], ['lock'], ['unlock']])
+  expect(operation).not.toHaveBeenCalled()
+  expect(restart.active).toBe(false)
+  expect(events).toContain('unblock')
+})
+
+it('keeps admission blocked until a recovery unlock is acknowledged', async () => {
+  const { restart, host, operation, events } = setup()
+  host.updateTasks.mockRejectedValueOnce(new Error('admission timeout'))
+    .mockRejectedValueOnce(new Error('unlock unavailable'))
+  await expect(restart.start({ kind: 'desktop', version: '2.0.0' })).rejects.toThrow('admission timeout')
+  host.updateTasks.mockResolvedValueOnce(false).mockRejectedValueOnce(new Error('unlock unavailable'))
+  await restart.recover()
+  expect(restart.active).toBe(true)
+  expect(events).not.toContain('unblock')
+  await restart.recover()
+  expect(restart.active).toBe(false)
+  expect(events).toContain('unblock')
+  expect(operation).not.toHaveBeenCalled()
+})
