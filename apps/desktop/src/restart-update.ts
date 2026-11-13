@@ -58,6 +58,7 @@ interface RestartDependencies {
 
 export class DesktopRestartUpdate {
   private paused = false
+  private updateRequested = false
   private interrupted = Promise.withResolvers<void>()
   private recovery: Promise<void> | undefined
   private operation: { key: string; request: DesktopRestartUpdateRequest; operationId?: string; promise: Promise<void> } | undefined
@@ -73,6 +74,7 @@ export class DesktopRestartUpdate {
     }
     if (request.kind === 'desktop' && request.version !== this.dependencies.state().version) throw new Error('desktop update: target changed')
     this.paused = false
+    this.updateRequested = false
     this.interrupted = Promise.withResolvers<void>()
     this.dependencies.block(true)
     const promise = Promise.resolve().then(() => this.run(request))
@@ -98,6 +100,14 @@ export class DesktopRestartUpdate {
       const host = await this.dependencies.recoverLockedHost()
       if (this.paused) return
       if (host === undefined) { this.failed(); return }
+      if (!this.updateRequested) {
+        await host.updateTasks('unlock')
+        if (this.paused) return
+        this.operation = undefined
+        this.dependencies.block(false)
+        this.dependencies.progress('failed')
+        return
+      }
       if (current.request.kind === 'plugins' && current.operationId === undefined) { this.failed(); return }
       const result = await host.updateOperation({ action: 'plugins-status', ...current.operationId === undefined ? {} : { operationId: current.operationId } })
       if (this.paused) return
@@ -147,15 +157,15 @@ export class DesktopRestartUpdate {
 
   private async run(request: DesktopRestartUpdateRequest): Promise<void> {
     const host = this.dependencies.host()
-    let safe = host === undefined
+    let safe = true
     try {
       if (host === undefined) throw new Error('desktop update: Host unavailable')
       this.dependencies.progress('preparing')
       await host.updateTasks('lock')
       if (this.paused) return
-      safe = true
       if (request.kind === 'desktop') {
         safe = false
+        this.updateRequested = true
         const prepared = await host.updateOperation({ action: 'desktop-prepare', desktopVersion: request.version })
         if (this.paused) return
         if (!prepared.ok && prepared.error.code !== 'route-missing') {
@@ -183,6 +193,7 @@ export class DesktopRestartUpdate {
       let operationId: string | undefined
       if (request.kind === 'plugins') {
         safe = false
+        this.updateRequested = true
         const accepted = await host.updateOperation({ action: 'plugins-install', plans: request.plans })
         if (!accepted.ok || typeof accepted.value !== 'object' || accepted.value === null
           || !('operationId' in accepted.value) || !text(accepted.value.operationId)) throw new Error('desktop update: installation state unavailable')
@@ -191,6 +202,7 @@ export class DesktopRestartUpdate {
         if (this.paused) return
       }
       safe = false
+      this.updateRequested = true
       this.dependencies.progress('plugins')
       for (;;) {
         let status: DesktopHostUpdateResult
