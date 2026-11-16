@@ -15,7 +15,7 @@ import type { ScheduleId, ScheduleCatalogEntry, ScheduleUpdateRequest, ScheduleU
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import type { CatalogInjected } from '../src/client/catalog-source.ts'
-import { ScheduleDeleteToast, type DeleteToastSource } from '../src/client/DeleteToast.tsx'
+import { ScheduleTaskToast, type TaskToastSource } from '../src/client/TaskToast.tsx'
 import { SCHEDULE_TASK_ID, SCHEDULE_TASK_KIND } from '../src/client/definition.ts'
 import { ScheduleTaskTab, type ScheduleTaskBindingInjected, type ScheduleTaskCatalogInjected, type ScheduleTaskTabInjected } from '../src/client/ScheduleTaskTab.tsx'
 import { ScheduleTaskTabTitle } from '../src/client/ScheduleTaskTabTitle.tsx'
@@ -225,10 +225,10 @@ describe('ui-schedule browser half', () => {
     await fiber.await()
     try {
       const overlay = ctx.slots.entries('shell.overlay')[0]!
-      expect(overlay.component).toBe(ScheduleDeleteToast)
-      expect(overlay.options).toMatchObject({ id: 'schedule.delete-toast' })
+      expect(overlay.component).toBe(ScheduleTaskToast)
+      expect(overlay.options).toMatchObject({ id: 'schedule.task-toast' })
       expect(overlay.locale).toBe('schedule.manager')
-      const toast = injectedFace(overlay) as Omit<DeleteToastSource, 'report'>
+      const toast = injectedFace(overlay) as Omit<TaskToastSource, 'report' | 'showCreateHint'>
       expect(toast.hooks.toast.getSnapshot()).toBeNull()
 
       const entry = ctx.slots.entries('conversation.session.header.utilities')[0]!
@@ -309,6 +309,7 @@ describe('ui-schedule browser half', () => {
         'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
         'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session' },
         main: { kind: 'keyed', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
     const startSession = vi.spyOn(ctx.uiWorkspace, 'startSession')
@@ -334,6 +335,10 @@ describe('ui-schedule browser half', () => {
       const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
       panel.onNewTask()
       expect(startSession).toHaveBeenCalledOnce()
+      const toast = injectedFace(ctx.slots.entries('shell.overlay')[0]!) as Omit<TaskToastSource, 'report' | 'showCreateHint'>
+      expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createInSession', seq: 1 })
+      panel.onNewTask()
+      expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createInSession', seq: 2 })
     } finally {
       await fiber.dispose()
       owner()
@@ -415,6 +420,7 @@ describe('ui-schedule browser half', () => {
       name: 'root',
       children: {
         main: { kind: 'keyed', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
         'sidebar.panellist': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
@@ -484,6 +490,7 @@ describe('ui-schedule browser half', () => {
         'sidebar.session.row.leading': { kind: 'list', scope: 'root' },
         'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
         main: { kind: 'keyed', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
     const fiber = ctx.plugin({ inject: [...inject], apply })

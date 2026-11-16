@@ -3008,7 +3008,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-chat QuotaNoticeHost id \'chat.quota-notice\'',
       'client-ui-plugin-manager PluginRefreshToast id \'plugin-manager.refresh-toast\'',
-      'client-ui-schedule ScheduleDeleteToast id \'schedule.delete-toast\'',
+      'client-ui-schedule ScheduleTaskToast id \'schedule.task-toast\'',
       'client-ui-settings-account DesktopOnboardingEntry id \'desktop-onboarding\'',
       'client-ui-settings-account AccountPlatformHost id \'account.platform-page\'',
       'client-ui-settings-session-log UploadToast id \'session-log-upload-toast\'',

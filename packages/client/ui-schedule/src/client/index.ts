@@ -43,7 +43,7 @@ import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ScheduleCatalogEntry, ScheduleDeliveryHistoryRequest, ScheduleId, ScheduleUpdateRequest } from '@deepseek-ai/dsh-schedule/client'
 import { createCatalogSource, type CatalogDeleteOutcome, type CatalogInjected } from './catalog-source.ts'
-import { createDeleteToastSource, ScheduleDeleteToast } from './DeleteToast.tsx'
+import { createTaskToastSource, ScheduleTaskToast } from './TaskToast.tsx'
 import { SCHEDULE_TASK_ID, SCHEDULE_TASK_KIND, scheduleTaskDefinition } from './definition.ts'
 import { ScheduleCatalogAction } from './ScheduleCatalogAction.tsx'
 import { ScheduleTurnCard, type ScheduleTurnCardInjected } from './ScheduleTurnCard.tsx'
@@ -99,20 +99,17 @@ export function apply(ctx: ClientContext): void {
     subscribeChanged: listener => ctx.remote.$on('schedule/changed', listener),
     subscribeReset: listener => ctx.on('connection/reset', listener),
   })
-  // One outcome store behind one `shell.overlay` entry announces every deletion
-  // this plugin's surfaces settle, so the notice outlives the panel, popover, or
-  // tab the deletion started in.
-  const deleteToast = createDeleteToastSource()
+  const taskToast = createTaskToastSource()
   const reportedDelete = (onDelete: (id: ScheduleId) => Promise<CatalogDeleteOutcome>) =>
     async (id: ScheduleId): Promise<CatalogDeleteOutcome> => {
       const outcome = await onDelete(id)
-      deleteToast.report(outcome)
+      taskToast.report(outcome)
       return outcome
     }
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-    name: 'shell.overlay', id: 'schedule.delete-toast', locale: MANAGER_NS,
-    inject: () => ({ hooks: deleteToast.hooks, dismiss: deleteToast.dismiss }),
-  }, ScheduleDeleteToast))
+    name: 'shell.overlay', id: 'schedule.task-toast', locale: MANAGER_NS,
+    inject: () => ({ hooks: taskToast.hooks, dismiss: taskToast.dismiss }),
+  }, ScheduleTaskToast))
   /**
    * Forward one compare-and-update request, which may replace the task name,
    * the instruction, and/or the timing, and refresh the authoritative catalog
@@ -171,8 +168,10 @@ export function apply(ctx: ClientContext): void {
     locale: MANAGER_NS,
     inject: (): TaskManagerInjected => ({
       ...detail,
-      // The page has no creation form: a new reminder starts in a Session.
-      onNewTask: () => { ctx.uiWorkspace.startSession() },
+      onNewTask: () => {
+        ctx.uiWorkspace.startSession()
+        taskToast.showCreateHint()
+      },
     }),
   }, TaskManagerPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
