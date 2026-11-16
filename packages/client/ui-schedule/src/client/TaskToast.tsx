@@ -7,7 +7,7 @@
  * in-place deletion notice of their own, so an outcome outlives the panel or
  * tab that asked for it.
  */
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useState, type ReactNode } from 'react'
 import { IconWarningOutlineRegular, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -77,9 +77,22 @@ export type ScheduleTaskToastProps = PropsRuntime<'shell.overlay'>
  */
 export function ScheduleTaskToast({ useToast, dismiss, t }: ScheduleTaskToastProps): ReactNode {
   const toast = useToast(current => current)
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    if (toast?.kind !== 'createInSession') return
+    const locate = (): void => {
+      const composer = document.querySelector<HTMLElement>('[data-composer-card]')
+      setAnchor(composer)
+      if (composer !== null) observer.disconnect()
+    }
+    const observer = new MutationObserver(locate)
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-composer-card'] })
+    locate()
+    return () => { observer.disconnect() }
+  }, [toast?.kind, toast?.seq])
   if (toast === null) return null
   if (toast.kind === 'createInSession') {
-    return <Toast key={`schedule-create-${String(toast.seq)}`} text={t('toast.createInSession')} holdMs={10000} onDone={dismiss} />
+    return <Toast key={`schedule-create-${String(toast.seq)}`} text={t('toast.createInSession')} anchor={anchor} holdMs={10000} onDone={dismiss} />
   }
   return toast.kind === 'deleted'
     ? <Toast key={`schedule-delete-${String(toast.seq)}`} text={t('toast.deleted')} tone="success" onDone={dismiss} />

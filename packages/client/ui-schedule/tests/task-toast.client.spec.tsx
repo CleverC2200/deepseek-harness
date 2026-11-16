@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /** The app-wide deletion toast: one outcome store behind one overlay banner. */
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import {
@@ -51,6 +51,24 @@ describe('task toast source', () => {
 })
 
 describe('ScheduleTaskToast', () => {
+  it('centers creation guidance after navigation mounts the composer', async () => {
+    const props = {
+      useToast: <T,>(select: (value: TaskToastState | null) => T): T => select({ kind: 'createInSession', seq: 1 }),
+      dismiss: vi.fn(),
+      t: makeTranslate(en),
+    } as ScheduleTaskToastProps
+    const view = render(<><div /><ScheduleTaskToast {...props} /></>)
+    view.rerender(<>
+      <div data-composer-card ref={(element) => {
+        if (element !== null) {
+          element.getBoundingClientRect = () => new DOMRect(420, 400, 714, 120)
+        }
+      }} />
+      <ScheduleTaskToast {...props} />
+    </>)
+    await waitFor(() => { expect(screen.getByRole('alert').style.left).toBe('777px') })
+  })
+
   it.each([en, zh])('shows creation guidance long enough to read', (dictionary) => {
     vi.useFakeTimers()
     const { dismiss } = mount({ kind: 'createInSession', seq: 1 }, dictionary)
