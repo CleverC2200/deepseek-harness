@@ -173,7 +173,7 @@ function mount(
     useResource: () => { throw new Error('The task manager does not load document resources') },
     onDelete: vi.fn<TaskManagerPageProps['onDelete']>(async () => 'deleted'),
     onRetry: vi.fn(async () => {}),
-    onNewTask: vi.fn(),
+    onCreateTask: vi.fn<TaskManagerPageProps['onCreateTask']>(async () => ({ ok: true, value: { created: true, record: at } })),
     onUpdateTiming: vi.fn<TaskManagerPageProps['onUpdateTiming']>(async ({ expected }) => ({
       ok: true, value: { id: expected.id, updated: false, record: expected },
     })),
@@ -612,13 +612,65 @@ it('updates original Session navigation as metadata arrives and archive state ch
 })
 
 describe('Task manager catalog', () => {
-  it('starts a new Session instead of offering a page creation form', () => {
+  it('opens a creation form without starting a new Session', () => {
     const h = mount({ records: [at] })
     // The heading's compact action and the empty state's named action are the
     // mock's two creation entries; only the heading's shows while a row exists.
     fireEvent.click(screen.getByRole('button', { name: en['new.action'] }))
-    expect(h.props.onNewTask).toHaveBeenCalledOnce()
+    expect(screen.getByRole('dialog', { name: en['empty.action'] })).toBeDefined()
+    expect(h.props.onCreateTask).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: en['empty.action'] })).toBeNull()
+  })
+
+  it('cancels a new task without creating it and restores focus to the entry', () => {
+    const h = mount({ records: [] })
+    const entry = screen.getByRole('button', { name: en['empty.action'] })
+    entry.focus()
+    fireEvent.click(entry)
+    fireEvent.click(screen.getByRole('button', { name: en['rule.cancel'] }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(h.props.onCreateTask).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(entry)
+  })
+
+  it('validates required content before saving and closes after a successful save', async () => {
+    const h = mount({ records: [] })
+    fireEvent.click(screen.getByRole('button', { name: en['empty.action'] }))
+    fireEvent.click(screen.getByRole('button', { name: en['create.action'] }))
+    expect(screen.getByRole('alert').textContent).toBe(en['rule.invalidTitle'])
+    expect(h.props.onCreateTask).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByRole('textbox', { name: en['detail.name'] }), { target: { value: 'Inventory check' } })
+    fireEvent.change(screen.getByRole('textbox', { name: en['detail.instruction'] }), { target: { value: 'Check inventory' } })
+    fireEvent.click(screen.getByRole('button', { name: en['create.action'] }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+    expect(h.props.onCreateTask).toHaveBeenCalledOnce()
+    const request = vi.mocked(h.props.onCreateTask).mock.calls[0]?.[0]
+    expect(request?.requestId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(request?.title).toBe('Inventory check')
+    expect(request?.prompt).toBe('Check inventory')
+    expect(request?.at).toMatchObject({ time_zone: DEVICE_ZONE })
+    expect(screen.getByTestId('task-manager-page')).toBeDefined()
+  })
+
+  it('retains the draft and the submission identity after an uncertain response', async () => {
+    const pending = Promise.withResolvers<Awaited<ReturnType<TaskManagerPageProps['onCreateTask']>>>()
+    const create = vi.fn<TaskManagerPageProps['onCreateTask']>().mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce({ ok: true, value: { created: true, record: at } })
+    mount({ records: [] }, en, { onCreateTask: create })
+    fireEvent.click(screen.getByRole('button', { name: en['empty.action'] }))
+    fireEvent.change(screen.getByRole('textbox', { name: en['detail.name'] }), { target: { value: 'Inventory' } })
+    fireEvent.change(screen.getByRole('textbox', { name: en['detail.instruction'] }), { target: { value: 'Check inventory' } })
+    fireEvent.click(screen.getByRole('button', { name: en['create.action'] }))
+    expect(screen.getByRole('button', { name: en['create.pending'] }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: en['rule.cancel'] }))
+    expect(screen.getByRole('dialog')).toBeDefined()
+    await act(async () => { pending.reject(new Error('connection interrupted')) })
+    expect(screen.getByRole('alert').textContent).toBe(en['create.error'])
+    expect(screen.getByRole('textbox', { name: en['detail.name'] }).getAttribute('value')).toBe('Inventory')
+    fireEvent.click(screen.getByRole('button', { name: en['create.retry'] }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(create.mock.calls[0]?.[0].requestId).toBe(create.mock.calls[1]?.[0].requestId)
   })
 
   it('lays the page out on the mock content column, heading, search field, and rows', () => {
@@ -824,7 +876,8 @@ describe('Task manager catalog', () => {
     // The empty state's action keeps the mock's single creation entry: it starts a
     // new Session instead of resetting the filters the reader chose.
     fireEvent.click(emptyNewTaskButton())
-    expect(h.props.onNewTask).toHaveBeenCalledOnce()
+    expect(screen.getByRole('dialog', { name: en['empty.action'] })).toBeDefined()
+    expect(h.props.onCreateTask).not.toHaveBeenCalled()
     expect(taskNames()).toEqual([])
     expect(screen.getByRole<HTMLInputElement>('searchbox').value).toBe('release')
     expect(within(statuses).getByRole('button', { name: en['status.inactive'] }).getAttribute('aria-pressed')).toBe('true')

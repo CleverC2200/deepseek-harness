@@ -171,8 +171,13 @@ export function apply(ctx: ClientContext): void {
     locale: MANAGER_NS,
     inject: (): TaskManagerInjected => ({
       ...detail,
-      // The page has no creation form: a new reminder starts in a Session.
-      onNewTask: () => { ctx.uiWorkspace.startSession() },
+      onCreateTask: async (request) => {
+        const result = await ctx.remote.schedule.createTask(request)
+        if (result.ok && result.value.created) {
+          await manager.onRetry(manager.hooks.catalog.getSnapshot().readRequest)
+        }
+        return result
+      },
     }),
   }, TaskManagerPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

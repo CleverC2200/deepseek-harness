@@ -5,7 +5,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import { ScheduleRuntime } from './runtime.ts'
 import { registerScheduleTools } from './tools.ts'
@@ -20,7 +20,7 @@ import {
 import type {
   DeliveryRetentionBounds, ScheduleCatalogEntry, ScheduleCreateRequest, ScheduleDeleteRequest, ScheduleDeleteResult,
   ScheduleDeliveryHistoryRequest, ScheduleDeliveryHistoryResult, ScheduleListRequest, ScheduleRecord,
-  ScheduleUpdateRequest, ScheduleUpdateResult,
+  ScheduleUpdateRequest, ScheduleUpdateResult, SchedulePageCreateRequest, SchedulePageCreateResult,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -247,14 +247,27 @@ export class ScheduleService extends TypertRemoteService {
    * @returns The durably stored schedule. Cancellation does not roll back an in-flight write.
    */
   async create(sessionId: SessionId, request: ScheduleCreateRequest, signal?: AbortSignal): Promise<ScheduleRecord> {
+    const record = this.createRecord(request, ScheduleId(`schedule-${randomUUID()}`), Date.now())
+    const id = record.id
+    return this.serialize(async () => {
+      const domain = await this.getDomain()
+      signal?.throwIfAborted()
+      await domain.table('tasks').put(id, {
+        sessionId, record, status: 'active', deliveryHistory: { records: [], earlierRecordsUnavailable: false },
+      })
+      this.emitChanged()
+      this.runtime?.requestDrive()
+      return record
+    })
+  }
+
+  private createRecord(request: ScheduleCreateRequest, id: ScheduleRecord['id'], now: number): ScheduleRecord {
     if (Number(request.at !== undefined) + Number(request.after_seconds !== undefined)
       + Number(request.every_seconds !== undefined) + Number(request.daily !== undefined)
       + Number(request.weekly !== undefined) + Number(request.cron !== undefined) > 1) {
       throw new ScheduleInputError('invalid_selector', 'Exactly one reminder selector is required.')
     }
     const title = scheduleTitle(request.title)
-    const id = ScheduleId(`schedule-${randomUUID()}`)
-    const now = Date.now()
     let record: ScheduleRecord
     if (request.at !== undefined) {
       record = createAtScheduleRecord(id, request.prompt, request.at, now, title)
@@ -269,15 +282,40 @@ export class ScheduleService extends TypertRemoteService {
     else if (request.weekly !== undefined) record = createWeeklyScheduleRecord(id, request.prompt, request.weekly, now, title)
     else if (request.cron !== undefined) record = createCronScheduleRecord(id, request.prompt, request.cron, now, title)
     else throw new ScheduleInputError('invalid_selector', 'Exactly one reminder selector is required.')
+    return record
+  }
+
+  @Remote('createTask')
+  async createTask(request: SchedulePageCreateRequest, signal?: AbortSignal): Promise<SchedulePageCreateResult> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.requestId)) {
+      return { created: false, code: 'invalid_selector' }
+    }
+    const now = Date.now()
     return this.serialize(async () => {
-      const domain = await this.getDomain()
+      const tasks = (await this.getDomain()).table('tasks')
       signal?.throwIfAborted()
-      await domain.table('tasks').put(id, {
+      const id = ScheduleId(`schedule-${request.requestId}`)
+      const existing = tasks.get(id)
+      if (existing !== undefined) {
+        return { created: true, record: { ...existing.record, sessionId: existing.sessionId, status: existing.status } }
+      }
+      let record: ScheduleRecord
+      try {
+        record = this.createRecord(request, id, now)
+      } catch (error) {
+        if (error instanceof ScheduleInputError) return { created: false, code: error.code }
+        throw error
+      }
+      const { sessionId } = await this.ctx.sessionController.create({
+        sessionId: SessionId(`schedule-session-${request.requestId}`),
+      })
+      signal?.throwIfAborted()
+      await tasks.put(id, {
         sessionId, record, status: 'active', deliveryHistory: { records: [], earlierRecordsUnavailable: false },
       })
       this.emitChanged()
       this.runtime?.requestDrive()
-      return record
+      return { created: true, record: { ...record, sessionId, status: 'active' } }
     })
   }
 

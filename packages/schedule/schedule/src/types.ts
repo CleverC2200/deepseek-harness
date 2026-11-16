@@ -379,6 +379,14 @@ export interface ScheduleCreateRequest {
   cron?: CronInput
 }
 
+export interface SchedulePageCreateRequest extends ScheduleCreateRequest {
+  readonly requestId: string
+}
+
+export type SchedulePageCreateResult =
+  | { readonly created: true; readonly record: ScheduleCatalogEntry }
+  | { readonly created: false; readonly code: Extract<ScheduleUpdateResult, { code: string }>['code'] }
+
 /** Session-scoped task list, without Agent activation. */
 export interface ScheduleListRequest {
   /** Original Session binding. */

@@ -1007,7 +1007,7 @@ function zonedWeekday(instant: string, timeZone: string): Weekday {
  * @param weekdays - ISO weekday set the weekly choice saves.
  * @returns the complete timing change for the compare-and-update request.
  */
-function ruleChange(
+export function ruleChange(
   draft: TimingDraft,
   kind: RuleKind,
   weekdays: readonly Weekday[],
@@ -1064,7 +1064,7 @@ function validIsoDate(value: string): boolean {
  * @param shown - values the detail shows.
  * @returns dictionary key of the invalid field, or undefined when the draft can be saved.
  */
-function draftError(shown: RuleShown): TaskManagerKey | undefined {
+export function draftError(shown: RuleShown): TaskManagerKey | undefined {
   const title = shown.title.trim()
   if (title.length === 0 || title.length > RULE_TITLE_MAX_LENGTH) return 'rule.invalidTitle'
   if (shown.prompt.trim().length === 0) return 'rule.invalidPrompt'
@@ -1192,7 +1192,7 @@ function guardMenuEscape(event: KeyboardEvent<HTMLElement>, open: boolean, close
 /** Inputs of the Run time card: the detail's staged values, its blocking state, and the draft owners. */
 interface RuleCardProps extends PropsLocale<'schedule.manager'> {
   /** Rule whose timing rows the card edits. */
-  readonly task: ScheduleCatalogEntry
+  readonly task: ScheduleCatalogEntry | undefined
   /** Whether catalog loading, a pending save, an in-flight deletion, or an ended rule blocks every edit. */
   readonly disabled: boolean
   /** Values the detail stages; the card reads only their timing fields. */
@@ -1216,7 +1216,7 @@ interface RuleCardProps extends PropsLocale<'schedule.manager'> {
 }
 
 /** Values one task's detail stages, seeded from one stored record. */
-interface RuleShown {
+export interface RuleShown {
   /** Task name the heading control edits. */
   readonly title: string
   /** Reminder instruction the instruction control edits. */
@@ -1435,7 +1435,7 @@ function WeekdayRow({ weekdays, disabled, t, rowId, onToggle }: {
  * @param props - task, staged values, blocking state, draft callbacks, and locale.
  * @returns the bordered Run time card with its staged rows.
  */
-function RuleCard({
+export function RuleCard({
   task, disabled, values, intervalUnit, failure, onChooseKind, onChooseZone, onToggleWeekday, onEditDraft, t,
 }: RuleCardProps): ReactNode {
   const shown = values
@@ -1540,7 +1540,7 @@ function RuleCard({
   // A rule that stored no zone needs one line saying so. The clock-time choices
   // whose rule does state a zone carry that fact in their own names, so their row
   // shows no hint at all, and the zone row's own picker names the rest.
-  const clockHint: TaskManagerKey | undefined = shown.kind === 'once' && !draftZone(task).stored
+  const clockHint: TaskManagerKey | undefined = shown.kind === 'once' && (task === undefined || !draftZone(task).stored)
     ? 'timing.zoneNoStored'
     : undefined
   const clockLine = failure ?? clockHint
@@ -1579,7 +1579,7 @@ function RuleCard({
             <span className={clsx(css.ruleValueFace, css.ruleControl)}>
               <span className={css.ruleCurrent}>{shown.kind === 'every'
                 ? t(intervalRuleLabel(intervalUnit))
-                : repeatValue(task, shown.kind, t, frequencyZone)}</span>
+                : task === undefined ? t(RULE_KIND_LABELS[shown.kind]) : repeatValue(task, shown.kind, t, frequencyZone)}</span>
               <IconChevronDownOutlineRegular />
             </span>
           </button>}
@@ -1730,7 +1730,7 @@ function RuleCard({
         {/* The cron rows edit their whole expression through one callback, so
             the sentence the card derives from it sits with the card's other hints. */}
         {shown.kind === 'cron' && <CronRows
-          task={task}
+          task={task ?? { scheduledAt: new Date().toISOString() }}
           disabled={disabled}
           expression={shown.draft.expression}
           timeZone={shown.draft.timeZone}
@@ -1853,7 +1853,7 @@ const CRON_DEFAULT_MINUTE_STEP = 5
 /** Inputs of the cron builder rows inside the Run time card. */
 interface CronRowsProps extends PropsLocale<'schedule.manager'> {
   /** Rule whose committed occurrence seeds fields the staged shape lacks. */
-  readonly task: ScheduleCatalogEntry
+  readonly task: Pick<ScheduleCatalogEntry, 'scheduledAt'>
   /** Whether every edit is blocked, same as the card's other rows. */
   readonly disabled: boolean
   /** Staged five-field expression the rows read and regenerate. */

@@ -330,15 +330,47 @@ describe('ui-schedule browser half', () => {
       ) as ScheduleTaskCatalogInjected & ScheduleTaskBindingInjected
       expect(chip.taskBindings).toBe(body.taskBindings)
       expect(chip.hooks.catalog).toBe(body.hooks.catalog)
-      // The panel starts a new reminder in a Session rather than opening a creation form.
       const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
-      panel.onNewTask()
-      expect(startSession).toHaveBeenCalledOnce()
+      expect(panel.onCreateTask).toBeTypeOf('function')
+      expect(startSession).not.toHaveBeenCalled()
     } finally {
       await fiber.dispose()
       owner()
       await ctx.fiber.dispose()
     }
+  })
+
+  it('creates from the page without navigation and refreshes the authoritative catalog', async () => {
+    const request = {
+      requestId: '33ecddf5-7a49-4d31-8626-3527746b8c65', title: 'Inventory', prompt: 'Check inventory', every_seconds: 3600,
+    }
+    const record: ScheduleCatalogEntry = {
+      id: 'page-task' as ScheduleId, sessionId: 'page-session' as SessionId,
+      kind: 'every', everySeconds: 3600, title: request.title, prompt: request.prompt,
+      scheduledAt: '2099-01-01T00:00:00Z', status: 'active',
+    }
+    const result = { ok: true, value: { created: true, record } }
+    const createTask = vi.fn().mockResolvedValue(result)
+    const catalog = vi.fn().mockResolvedValue({ ok: true, value: [record] })
+    const ctx = await baseContext({ schedule: { createTask, catalog }, $on: () => () => {} })
+    const started = vi.spyOn(ctx.uiWorkspace, 'startSession')
+    const opened = vi.spyOn(ctx.uiWorkspace, 'openSession')
+    const owner = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' } } } as never, Empty)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    try {
+      const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
+      const unsubscribe = panel.hooks.catalog.subscribe(() => {})
+      try {
+        await vi.waitFor(() => { expect(panel.hooks.catalog.getSnapshot().status).toBe('ready') })
+        const reads = catalog.mock.calls.length
+        expect(await panel.onCreateTask(request)).toEqual(result)
+        expect(createTask).toHaveBeenCalledExactlyOnceWith(request)
+        expect(catalog).toHaveBeenCalledTimes(reads + 1)
+        expect(started).not.toHaveBeenCalled()
+        expect(opened).not.toHaveBeenCalled()
+      } finally { unsubscribe() }
+    } finally { await fiber.dispose(); owner(); await ctx.fiber.dispose() }
   })
 
   it('opens the task tab with the entry Session and the chosen task id', async () => {

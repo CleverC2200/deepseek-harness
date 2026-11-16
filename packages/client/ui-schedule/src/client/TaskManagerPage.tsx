@@ -6,7 +6,9 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { ScheduleCatalogEntry, ScheduleId } from '@deepseek-ai/dsh-schedule/client'
+import type { ScheduleCatalogEntry, ScheduleId, SchedulePageCreateRequest, SchedulePageCreateResult } from '@deepseek-ai/dsh-schedule/client'
+import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
+import { TaskCreateForm } from './TaskCreateForm.tsx'
 import type { CatalogSnapshot } from './catalog-source.ts'
 import { CatalogFeedback } from './CatalogFeedback.tsx'
 import { TaskDetail, useTaskDetail, type TaskDetailInjected } from './TaskDetail.tsx'
@@ -19,11 +21,7 @@ import css from './TaskManagerPage.module.css'
 export interface TaskManagerInjected extends TaskDetailInjected {
   /** Host task catalog with its query and deletion state. */
   readonly hooks: { readonly catalog: HostObservable<CatalogSnapshot<ScheduleCatalogEntry>> }
-  /**
-   * Start a new Session, where a reminder is created by asking the model to
-   * schedule it. The page deliberately has no creation form of its own.
-   */
-  readonly onNewTask: () => void
+  readonly onCreateTask: (request: SchedulePageCreateRequest) => Promise<RemoteResult<SchedulePageCreateResult>>
 }
 
 /** Root-scoped task catalog props derived from the framework and injected actions. */
@@ -39,9 +37,11 @@ type StatusFilter = 'all' | ScheduleCatalogEntry['status']
  * @returns the searchable task list beside the selected task's detail.
  */
 export function TaskManagerPage(props: TaskManagerPageProps) {
-  const { useCatalog, onNewTask, onRetry, t } = props
+  const { useCatalog, onCreateTask, onRetry, t } = props
   const catalog = useCatalog(snapshot => snapshot)
   const { records, status } = catalog
+  const [creating, setCreating] = useState(false)
+  const onNewTask = (): void => { setCreating(true) }
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedId, setSelectedId] = useState<ScheduleId | null>(null)
@@ -207,6 +207,12 @@ export function TaskManagerPage(props: TaskManagerPageProps) {
         authoritative={catalogRecord !== undefined}
         onDeleted={closeDetails}
         onClose={closeDetails}
+      />}
+      {creating && <TaskCreateForm
+        onCreateTask={onCreateTask}
+        onClose={() => { setCreating(false) }}
+        onCreated={() => { setCreating(false); setSearch(''); setStatusFilter('all'); setSelectedId(null) }}
+        t={t}
       />}
     </section>
   )
