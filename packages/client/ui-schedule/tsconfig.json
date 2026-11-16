@@ -58,9 +58,6 @@
     },
     {
       "path": "../../util/values"
-    },
-    {
-      "path": "../../util/crypto"
     }
   ]
 }

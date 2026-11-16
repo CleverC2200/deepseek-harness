@@ -4,26 +4,26 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import {
-  createDeleteToastSource, ScheduleDeleteToast,
-  type DeleteToastState, type ScheduleDeleteToastProps,
-} from '../src/client/DeleteToast.tsx'
+  createTaskToastSource, ScheduleTaskToast,
+  type TaskToastState, type ScheduleTaskToastProps,
+} from '../src/client/TaskToast.tsx'
 import { en, zh } from '../src/client/task-manager-locales.ts'
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
-function mount(state: DeleteToastState | null, dictionary: typeof en | typeof zh = en) {
+function mount(state: TaskToastState | null, dictionary: typeof en | typeof zh = en) {
   const dismiss = vi.fn()
   const props = {
-    useToast: <T,>(select: (value: DeleteToastState | null) => T): T => select(state),
+    useToast: <T,>(select: (value: TaskToastState | null) => T): T => select(state),
     dismiss,
     t: makeTranslate(dictionary),
-  } as ScheduleDeleteToastProps
-  return { view: render(<ScheduleDeleteToast {...props} />), dismiss }
+  } as ScheduleTaskToastProps
+  return { view: render(<ScheduleTaskToast {...props} />), dismiss }
 }
 
-describe('delete toast source', () => {
+describe('task toast source', () => {
   it('publishes each settled outcome under a new sequence and ignores pending', () => {
-    const source = createDeleteToastSource()
+    const source = createTaskToastSource()
     const listener = vi.fn()
     const stop = source.hooks.toast.subscribe(listener)
     expect(source.hooks.toast.getSnapshot()).toBeNull()
@@ -50,7 +50,17 @@ describe('delete toast source', () => {
   })
 })
 
-describe('ScheduleDeleteToast', () => {
+describe('ScheduleTaskToast', () => {
+  it.each([en, zh])('shows creation guidance long enough to read', (dictionary) => {
+    vi.useFakeTimers()
+    const { dismiss } = mount({ kind: 'createInSession', seq: 1 }, dictionary)
+    expect(screen.getByRole('alert').textContent).toBe(dictionary['toast.createInSession'])
+    act(() => { vi.advanceTimersByTime(10000) })
+    expect(dismiss).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(dismiss).toHaveBeenCalledOnce()
+  })
+
   it('renders nothing while no outcome shows', () => {
     mount(null)
     expect(screen.queryByRole('alert')).toBeNull()

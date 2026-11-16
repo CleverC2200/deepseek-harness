@@ -15,7 +15,7 @@ import type { ScheduleId, ScheduleCatalogEntry, ScheduleUpdateRequest, ScheduleU
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import type { CatalogInjected } from '../src/client/catalog-source.ts'
-import { ScheduleDeleteToast, type DeleteToastSource } from '../src/client/DeleteToast.tsx'
+import { ScheduleTaskToast, type TaskToastSource } from '../src/client/TaskToast.tsx'
 import { SCHEDULE_TASK_ID, SCHEDULE_TASK_KIND } from '../src/client/definition.ts'
 import { ScheduleTaskTab, type ScheduleTaskBindingInjected, type ScheduleTaskCatalogInjected, type ScheduleTaskTabInjected } from '../src/client/ScheduleTaskTab.tsx'
 import { ScheduleTaskTabTitle } from '../src/client/ScheduleTaskTabTitle.tsx'
@@ -225,10 +225,10 @@ describe('ui-schedule browser half', () => {
     await fiber.await()
     try {
       const overlay = ctx.slots.entries('shell.overlay')[0]!
-      expect(overlay.component).toBe(ScheduleDeleteToast)
-      expect(overlay.options).toMatchObject({ id: 'schedule.delete-toast' })
+      expect(overlay.component).toBe(ScheduleTaskToast)
+      expect(overlay.options).toMatchObject({ id: 'schedule.task-toast' })
       expect(overlay.locale).toBe('schedule.manager')
-      const toast = injectedFace(overlay) as Omit<DeleteToastSource, 'report'>
+      const toast = injectedFace(overlay) as Omit<TaskToastSource, 'report' | 'showCreateHint'>
       expect(toast.hooks.toast.getSnapshot()).toBeNull()
 
       const entry = ctx.slots.entries('conversation.session.header.utilities')[0]!
@@ -309,6 +309,7 @@ describe('ui-schedule browser half', () => {
         'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
         'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session' },
         main: { kind: 'keyed', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
     const startSession = vi.spyOn(ctx.uiWorkspace, 'startSession')
@@ -330,47 +331,19 @@ describe('ui-schedule browser half', () => {
       ) as ScheduleTaskCatalogInjected & ScheduleTaskBindingInjected
       expect(chip.taskBindings).toBe(body.taskBindings)
       expect(chip.hooks.catalog).toBe(body.hooks.catalog)
+      // The panel starts a new reminder in a Session rather than opening a creation form.
       const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
-      expect(panel.onCreateTask).toBeTypeOf('function')
-      expect(startSession).not.toHaveBeenCalled()
+      panel.onNewTask()
+      expect(startSession).toHaveBeenCalledOnce()
+      const toast = injectedFace(ctx.slots.entries('shell.overlay')[0]!) as Omit<TaskToastSource, 'report' | 'showCreateHint'>
+      expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createInSession', seq: 1 })
+      panel.onNewTask()
+      expect(toast.hooks.toast.getSnapshot()).toEqual({ kind: 'createInSession', seq: 2 })
     } finally {
       await fiber.dispose()
       owner()
       await ctx.fiber.dispose()
     }
-  })
-
-  it('creates from the page without navigation and refreshes the authoritative catalog', async () => {
-    const request = {
-      requestId: '33ecddf5-7a49-4d31-8626-3527746b8c65', title: 'Inventory', prompt: 'Check inventory', every_seconds: 3600,
-    }
-    const record: ScheduleCatalogEntry = {
-      id: 'page-task' as ScheduleId, sessionId: 'page-session' as SessionId,
-      kind: 'every', everySeconds: 3600, title: request.title, prompt: request.prompt,
-      scheduledAt: '2099-01-01T00:00:00Z', status: 'active',
-    }
-    const result = { ok: true, value: { created: true, record } }
-    const createTask = vi.fn().mockResolvedValue(result)
-    const catalog = vi.fn().mockResolvedValue({ ok: true, value: [record] })
-    const ctx = await baseContext({ schedule: { createTask, catalog }, $on: () => () => {} })
-    const started = vi.spyOn(ctx.uiWorkspace, 'startSession')
-    const opened = vi.spyOn(ctx.uiWorkspace, 'openSession')
-    const owner = ctx.slots.register({ name: 'root', children: { main: { kind: 'keyed', scope: 'root' } } } as never, Empty)
-    const fiber = ctx.plugin({ inject: [...inject], apply })
-    await fiber.await()
-    try {
-      const panel = injectedFace(ctx.slots.entries('main')[0]!, undefined as never) as TaskManagerInjected
-      const unsubscribe = panel.hooks.catalog.subscribe(() => {})
-      try {
-        await vi.waitFor(() => { expect(panel.hooks.catalog.getSnapshot().status).toBe('ready') })
-        const reads = catalog.mock.calls.length
-        expect(await panel.onCreateTask(request)).toEqual(result)
-        expect(createTask).toHaveBeenCalledExactlyOnceWith(request)
-        expect(catalog).toHaveBeenCalledTimes(reads + 1)
-        expect(started).not.toHaveBeenCalled()
-        expect(opened).not.toHaveBeenCalled()
-      } finally { unsubscribe() }
-    } finally { await fiber.dispose(); owner(); await ctx.fiber.dispose() }
   })
 
   it('opens the task tab with the entry Session and the chosen task id', async () => {
@@ -447,6 +420,7 @@ describe('ui-schedule browser half', () => {
       name: 'root',
       children: {
         main: { kind: 'keyed', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
         'sidebar.panellist': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
@@ -516,6 +490,7 @@ describe('ui-schedule browser half', () => {
         'sidebar.session.row.leading': { kind: 'list', scope: 'root' },
         'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
         main: { kind: 'keyed', scope: 'root' },
+        'shell.overlay': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
     const fiber = ctx.plugin({ inject: [...inject], apply })
