@@ -88,7 +88,8 @@ const harness = await vi.hoisted(async () => {
       }),
     })
     readonly shown = deferred()
-    readonly show = vi.fn(() => { this.shown.resolve() })
+    readonly show = vi.fn(() => { this.emit('show'); this.shown.resolve() })
+    readonly maximize = vi.fn()
     readonly hide = vi.fn()
     enabled = true
     isEnabled() { return this.enabled }
@@ -2314,6 +2315,25 @@ describe('desktop main startup', () => {
     expect(harness.hosts[0]!.start).toHaveBeenCalledTimes(1)
     expect(harness.windows).toHaveLength(1)
     expect(window.urls).toEqual(['dsh-app://app/'])
+  })
+
+  it('opens the company workspace maximized without the official welcome or native check menu', async () => {
+    vi.stubEnv('GEA_COMPANY_CLIENT', '1')
+    await import('../src/main.ts')
+    await harness.preparing.promise
+    harness.prepared.resolve()
+    await harness.hostStarted.promise
+    const host = harness.hosts[0]!
+    host.fetch.mockResolvedValue(Response.json({ loggedIn: false, hasApiKey: false, localePreference: null }))
+    host.ready.resolve()
+    const window = harness.windows[0]!
+    await window.shown.promise
+    expect(window.maximize).toHaveBeenCalledOnce()
+    expect(host.fetch).not.toHaveBeenCalled()
+    expect(harness.windows).toHaveLength(1)
+    expect(applicationMenuItems().some(item => item.label === en.checkUpdatesMenu)).toBe(false)
+    window.show()
+    expect(window.maximize).toHaveBeenCalledOnce()
   })
 
   it('prepares an independent plugin profile for the unpackaged Host', async () => {

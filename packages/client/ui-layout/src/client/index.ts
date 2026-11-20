@@ -153,7 +153,8 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind('shortcuts.layout')
 
   ctx.effect(() => {
-    const handle = createLayoutStore()
+    const desktop = (globalThis as typeof globalThis & { dshDesktop?: { companyDesktop?: true } }).dshDesktop
+    const handle = createLayoutStore(desktop?.companyDesktop === true)
     const instance = handle.create()
     const store: typeof handle = { ...handle, create: () => instance }
     const retainMainPanels = (): void => {

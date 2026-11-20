@@ -76,6 +76,7 @@ export interface DesktopUpdatePresentation {
 /** Product documents supply version-bound update intent; the main process owns execution. */
 export interface DshDesktopProductApi {
   readonly protocolVersion: 1
+  readonly companyDesktop?: true
   readonly browser: DesktopBrowserBridge
   readonly keyboard: DesktopKeyboardApi
   readonly shortcuts: DesktopShortcutsApi

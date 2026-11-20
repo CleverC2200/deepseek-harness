@@ -60,9 +60,9 @@ function resize(width: number): void {
   })
 }
 
-function mountFrame(windowWidth = frameWidth) {
+function mountFrame(windowWidth = frameWidth, companyDesktop = false) {
   vi.stubGlobal('innerWidth', windowWidth)
-  const instance = createLayoutStore().create()
+  const instance = createLayoutStore(companyDesktop).create()
   const slotCalls: { key: string; props: object; options: RenderOpts | undefined }[] = []
   const renderSlot: AppFrameProps['renderSlot'] = (key, owner, options) => {
     slotCalls.push({ key, props: owner, options })
@@ -207,6 +207,21 @@ describe('AppFrame', () => {
     expect(sidebarOwner()).toEqual({ collapsed: false, width: 280 })
     expect(rightOwner()).toEqual({ width: 864, viewportWidth: 1920, canShow: true })
     expect(slotCalls.find(c => c.key === 'main')).toEqual({ key: 'main', props: {}, options: { entryKey: 'conversation' } })
+  })
+
+  it('uses the minimum company desktop panel widths and preserves a resized conversation', () => {
+    const { frame, instance, rightOwner } = mountFrame(1920, true)
+    expect(tracks(frame)).toEqual([264, 0])
+    expect(rightOwner().width).toBe(300)
+    act(() => instance.actions.openRightbar(true, false))
+    expect(tracks(frame)).toEqual([264, 300])
+    drag(handleFor(frame, 'rightbar'), 1620, 1520)
+    expect(tracks(frame)).toEqual([264, 400])
+    act(() => instance.actions.closeRightbar())
+    act(() => instance.actions.toggleSidebar())
+    act(() => instance.actions.toggleSidebar())
+    act(() => instance.actions.openRightbar(true, false))
+    expect(tracks(frame)).toEqual([264, 400])
   })
 
   it('renders the main, sidebar, and root-scoped rightbar outlets without a current Session', () => {

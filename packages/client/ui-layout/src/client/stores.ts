@@ -23,6 +23,7 @@ type LayoutState = {
 
 type LayoutInfo = {
   sidebar: number
+  sidebarDefault: number
   /** Last positive frame measurement; window width bootstraps the first render. */
   viewportWidth: number
   narrowExpanded: boolean
@@ -75,15 +76,17 @@ type LayoutActions = {
  * override; opening the right panel clears that override.
  * @returns the store handle (spec + type + identity + factory in one).
  */
-export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
+export function createLayoutStore(companyDesktop = false): EngineStoreHandle<LayoutState, LayoutActions>  {
+  const sidebarDefault = companyDesktop ? SIDEBAR_MIN : SIDEBAR_DEFAULT
   const handle = defineStore({
     init: (): LayoutState => ({
       panelInfo: { activePanelId: null },
       layoutInfo: {
-        sidebar: SIDEBAR_DEFAULT,
+        sidebar: sidebarDefault,
+        sidebarDefault,
         viewportWidth: window.innerWidth,
         narrowExpanded: false,
-        rightbar: null,
+        rightbar: companyDesktop ? RIGHTBAR_MIN : null,
         rightbarShown: false,
         rightbarTrack: false,
         rightbarFullscreen: false,
@@ -108,7 +111,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       toggleSidebar: (d) => {
         d.layoutInfo.rightbarInstant = false
         if (d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = !d.layoutInfo.narrowExpanded
-        else d.layoutInfo.sidebar = d.layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : 0
+        else d.layoutInfo.sidebar = d.layoutInfo.sidebar === 0 ? sidebarDefault : 0
       },
       // Crossing the breakpoint in either direction drops the override: the
       // narrow default is auto-collapsed, the wide state is the preference.
